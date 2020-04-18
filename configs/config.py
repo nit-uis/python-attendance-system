@@ -12,8 +12,6 @@ def init():
     parser.add_argument("-e", "--env", help="set environment, should be (forward/dev)", dest="env", default="default")
 
     args = parser.parse_args()
-    print("args", args, args.env, sys.argv)
-
     config = configparser.ConfigParser()
 
     if args.env == "dev":

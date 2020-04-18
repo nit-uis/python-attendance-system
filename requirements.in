@@ -8,3 +8,4 @@ requests
 schedule
 wheel
 telegram
+python-telegram-bot
