@@ -1,0 +1,10 @@
+configparser
+cryptography
+lxml
+neo4j
+pip
+protobuf
+requests
+schedule
+wheel
+telegram

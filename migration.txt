@@ -1,0 +1,139 @@
+////EXPORT
+//node
+MATCH (member:TgMemberGroup)
+RETURN member.uuid as uuid, member.name as name, member.updateAt as updateAt, member.createAt as createAt, member.status as status, member.defaultType as defaultType, member.tgGroupId as tgGroupId, member.defaultEndTime as defaultEndTime, member.defaultStartTime as defaultStartTime, member.defaultDays as defaultDays, member.defaultVenue as defaultVenue
+ORDER BY createAt asc
+
+MATCH (member:TgMember)
+RETURN member.uuid as uuid, member.name as name, member.updateAt as updateAt, member.createAt as createAt, member.status as status, member.type as type, member.tgGroupId as tgGroupId, member.tgId as tgId
+ORDER BY createAt asc
+
+MATCH (member:TgVenue)
+RETURN member.name as name, member.googleUrl as googleUrl, member.district as district
+ORDER BY name asc
+
+MATCH (endAt:TgTime)-[:END_AT]-(event:TgEvent)-[:START_AT]-(startAt:TgTime)
+WHERE event.status = "ACTIVE"
+MATCH (event)-[:HOLD_AT]-(venue:TgVenue)
+RETURN event.uuid as uuid, event.date as date, event.type as type, event.name as name, event.updateAt as updateAt, event.createAt as createAt, event.status as status, venue.name as holdAt_name, startAt.time as startAt_time, endAt.time as endAt_time
+ORDER BY createAt asc
+
+
+//relationship
+MATCH (memberGroup:TgMemberGroup)-[r]-(member:TgMember)
+RETURN DISTINCT memberGroup.uuid as tgMemberGroupId, member.uuid as tgMemberId, type(r) as r
+ORDER BY tgMemberGroupId, tgMemberId
+
+MATCH (memberGroup:TgMemberGroup)-[r]-(event:TgEvent)
+RETURN DISTINCT memberGroup.uuid as tgMemberGroupId, event.uuid as tgEventId, type(r) as r
+ORDER BY tgMemberGroupId, tgEventId
+
+MATCH (member:TgMember)-[r]-(event:TgEvent)
+RETURN DISTINCT member.uuid as tgMemberId, event.uuid as tgEventId, type(r) as r
+ORDER BY tgMemberId, tgEventId, r
+
+
+
+
+//IMPORT
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/n_tgMemberGroup.csv' AS line
+MERGE (n:TgMemberGroup{uuid: line.uuid})
+SET
+n.name = line.name,
+n.updateAt = toInteger(line.updateAt),
+n.createAt = toInteger(line.createAt),
+n.status = line.status,
+n.tgGroupId = line.tgGroupId,
+n.defaultType = line.defaultType,
+n.defaultEndTime = line.defaultEndTime,
+n.defaultStartTime = line.defaultStartTime,
+n.defaultDays = line.defaultDays,
+n.defaultVenue = line.defaultVenue
+RETURN *
+
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/n_tgMember.csv' AS line
+MERGE (n:TgMember{uuid: line.uuid})
+SET
+n.name = line.name,
+n.updateAt = toInteger(line.updateAt),
+n.createAt = toInteger(line.createAt),
+n.status = line.status,
+n.tgGroupId = line.tgGroupId,
+n.tgId = line.tgId,
+n.type = line.type
+RETURN *
+
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/n_tgVenue.csv' AS line
+MERGE (n:TgVenue{name: line.name})
+SET
+n.googleUrl = line.googleUrl,
+n.district = line.district
+RETURN *
+
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/n_tgEvent.csv' AS line
+MERGE (n:TgEvent{uuid: line.uuid})
+SET
+n.date = line.date,
+n.type = line.type,
+n.name = line.name,
+n.updateAt = toInteger(line.updateAt),
+n.createAt = toInteger(line.createAt),
+n.status = line.status
+WITH n, line
+MERGE (holdAt:TgVenue{name:line.holdAt_name})
+WITH n, holdAt, line
+MERGE (n)-[:HOLD_AT]->(holdAt)
+WITH n, line
+MERGE (startAt:TgTime{time:line.startAt_time})
+WITH n, startAt, line
+MERGE (n)-[:START_AT]->(startAt)
+WITH n, line
+MERGE (endAt:TgTime{time:line.endAt_time})
+WITH n, endAt, line
+MERGE (n)-[:END_AT]->(endAt)
+RETURN *
+
+
+
+
+
+
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/r_tgMemberGroup_tgMember.csv' AS line
+MATCH (mg:TgMemberGroup{uuid: line.tgMemberGroupId}), (m:TgMember{uuid: line.tgMemberId})
+MERGE (mg)-[:HAS]->(m)
+RETURN *
+
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/r_tgMemberGroup_tgEvent.csv' AS line
+MATCH (mg:TgMemberGroup{uuid: line.tgMemberGroupId}), (e:TgEvent{uuid: line.tgEventId})
+MERGE (mg)-[:HAS]->(e)
+RETURN *
+
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/r_tgMember_tgEvent.csv' AS line
+MATCH (m:TgMember{uuid: line.tgMemberId}), (e:TgEvent{uuid: line.tgEventId})
+WHERE line.r = "GO"
+MERGE (m)-[:GO]->(e)
+RETURN *
+
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/r_tgMember_tgEvent.csv' AS line
+MATCH (m:TgMember{uuid: line.tgMemberId}), (e:TgEvent{uuid: line.tgEventId})
+WHERE line.r = "NOT_GO"
+MERGE (m)-[:NOT_GO]->(e)
+RETURN *
+
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/r_tgMember_tgEvent.csv' AS line
+MATCH (m:TgMember{uuid: line.tgMemberId}), (e:TgEvent{uuid: line.tgEventId})
+WHERE line.r = "NOT_SURE"
+MERGE (m)-[:NOT_SURE]->(e)
+RETURN *
+
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/r_tgMember_tgEvent.csv' AS line
+MATCH (m:TgMember{uuid: line.tgMemberId}), (e:TgEvent{uuid: line.tgEventId})
+WHERE line.r = "GET_BALL"
+MERGE (m)-[:GET_BALL]->(e)
+RETURN *
+
+LOAD CSV WITH HEADERS FROM 'http://pas2.s3.us-east-2.amazonaws.com/r_tgMember_tgEvent.csv' AS line
+MATCH (m:TgMember{uuid: line.tgMemberId}), (e:TgEvent{uuid: line.tgEventId})
+WHERE line.r = "BRING_BALL"
+MERGE (m)-[:BRING_BALL]->(e)
+RETURN *
