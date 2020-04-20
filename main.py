@@ -14,14 +14,15 @@ def init():
     global LOGGER
     LOGGER = log.get_logger("main")
     config.init()
-    neo4j.init()
 
+    neo4j.init()
     settingdao.init()
     reportdao.init()
     memberdao.init()
     membergroupdao.init()
     eventdao.init()
 
+    tg.init()
     event.init()
     report.init()
     member.init()
@@ -34,12 +35,12 @@ if __name__ == '__main__':
     LOGGER.info(f"started, GIT_TAG={os.environ['GIT_TAG'] if 'GIT_TAG' in os.environ else ''}")
     LOGGER.info(f"target neo4j host: {config.get_string('neo4j', 'host')}")
 
-    # schedule.every(2).seconds.do(tg.get_updates)
+    schedule.every(2).seconds.do(tg.get_updates)
     schedule.every().day.at("04:00").do(report.get_monthly_report)
 
     config.reset()
 
     while 1:
         schedule.run_pending()
-        time.sleep(10)
+        time.sleep(1)
 
