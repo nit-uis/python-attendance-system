@@ -49,6 +49,11 @@ def getUtcnowSeconds():
     return int('%.0f'%(datetime.utcnow().timestamp()))
 
 
+# this is utc time on cloud server while it is utc - 8 time on localhost server DLLM
+def get_utc_now_in_ms():
+    return int('%.0f'%(datetime.utcnow().timestamp())) * 1000
+
+
 # this is hk time on cloud server while it is utc time on localhost server DLLM
 def getHknowSeconds():
     return getUtcnowSeconds() + 60*60*8
