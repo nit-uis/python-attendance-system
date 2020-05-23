@@ -12,10 +12,11 @@ def init():
     LOGGER = log.get_logger("settingdao")
 
 
-def get_key(key):
-    results = CLIENT.run("MATCH (setting:Setting) RETURN setting")
+def get(name):
+    results = CLIENT.run("MATCH (setting:Setting{name: {name}}) RETURN setting",
+                         {"name": name})
     for i in results:
-        return i['setting'][key]
+        return i['setting']
 
 
 def create_or_update_setting(vod_type, site_keys):

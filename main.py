@@ -13,7 +13,7 @@ LOGGER = None
 def init():
     global LOGGER
     LOGGER = log.get_logger("main")
-    config.init()
+    env = config.init()
 
     neo4j.init()
     settingdao.init()
@@ -22,7 +22,7 @@ def init():
     membergroupdao.init()
     eventdao.init()
 
-    tg.init()
+    tg.init(env)
     event.init()
     report.init()
     member.init()

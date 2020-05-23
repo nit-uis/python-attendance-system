@@ -16,7 +16,7 @@ def init():
 
 def find(tg_id, tg_group_id):
     results = CLIENT.run("""
-        MATCH (member:TgMember{tgId: {tg_id}, tgGroupId: {tg_group_id}}) 
+        MATCH (member:TgMember{tgId: {tg_id}, tgGroupId: {tg_group_id}, status: "ACTIVE"}) 
         RETURN member
     """, {"tg_id": tg_id, "tg_group_id": tg_group_id})
 
@@ -26,15 +26,35 @@ def find(tg_id, tg_group_id):
         return i['member']
 
 
-def find_by_member_type(tg_group_id, member_type):
-    results = CLIENT.run("MATCH (member:TgMember{tgGroupId: {tg_group_id}, member_type: {member_type}, status: {status}}) "
-                         "RETURN member",
-                         {"tg_group_id": tg_group_id, "member_type": member_type, "status": "ACTIVE"})
+def find_by_tg_group_id(tg_group_id):
+    results = CLIENT.run("""
+        MATCH (member:TgMember{tgGroupId: {tg_group_id}, status: "ACTIVE"}) 
+        RETURN member
+        ORDER BY member.type ASC, member.createAt ASC
+    """, {"tg_group_id": tg_group_id})
 
-    # return the first one
-    for i in results:
-        LOGGER.debug(i['member'])
-        return i['member']
+    return [i['member'] for i in results]
+
+
+# find members with specific member type in the same group
+def find_by_member_type_and_tg_group_id(tg_group_id, member_type):
+    results = CLIENT.run("""
+        MATCH (member:TgMember{tgGroupId: {tg_group_id}, member_type: {member_type}, status: "ACTIVE"}) 
+        RETURN member
+    """, {"tg_group_id": tg_group_id, "member_type": member_type})
+
+    return [i['member'] for i in results]
+
+
+# find members with specific member type in the same group
+def find_by_member_type_and_tg_id(tg_id, member_type):
+    results = CLIENT.run("""
+        MATCH (:TgMember{tgId: {tg_id}})--(mg:TgMemberGroup{status: "ACTIVE"})
+        MATCH (mg)--(member:TgMember{type: {member_type}, status: "ACTIVE"})
+        RETURN member
+    """, {"tg_id": tg_id, "member_type": member_type})
+
+    return [i['member'] for i in results]
 
 
 # [i['movie_id'] for i in results]

@@ -1,18 +1,24 @@
 from dao import settingdao
 from utils import ts, log
-from telegram import InlineQueryResultArticle, InputTextMessageContent
+from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, InlineQueryHandler, CallbackQueryHandler
 from services import member
 import traceback
 
 
 TOKEN = ""
+SUPER_ADMIN_TG_IDS = []
+TG_GROUP_ID = ""
 LOGGER = None
+FOOTPRINT = {}
 
 
-def init():
-    global TOKEN, LOGGER
-    TOKEN = settingdao.get_key("telegram_token")
+def init(env):
+    global TOKEN, SUPER_ADMIN_TG_IDS, TG_GROUP_ID, LOGGER
+    db_setting = settingdao.get(env)
+    TOKEN = db_setting['telegram_token']
+    SUPER_ADMIN_TG_IDS = db_setting['superAdminTgIds']
+    TG_GROUP_ID = db_setting['tgGroupId']
     LOGGER = log.get_logger("tg")
 
 
@@ -43,15 +49,10 @@ def get_updates():
 def handle_start(update, context):
     msg = ""
     LOGGER.info(update)
-    chat_id = str(update.effective_chat.id).strip()
-    user_id = str(update.effective_user.id).strip()
-    LOGGER.info(f"chat_id={chat_id}")
-    LOGGER.info(f"user_id={user_id}")
-    chat_type = update['message']['chat']['type']
-    if "group" not in chat_type:
-        raise Exception("係大gp再行多次 /start")
+    tg_id = str(update.effective_user.id).strip()
+    LOGGER.info(f"tg_id={tg_id}")
 
-    db_member = member.find(tg_id=user_id, tg_group_id=chat_id)
+    db_member = member.find(tg_id=tg_id, tg_group_id=TG_GROUP_ID)
 
     # if found -> send welcome
     if db_member:
@@ -59,18 +60,50 @@ def handle_start(update, context):
     # else -> register as inactive member -> send wait for admin approval
     else:
         name = update['message']['from_user']['first_name']
-        member.create(tg_id=user_id, tg_group_id=chat_id, name=name)
+        member.create(tg_id=tg_id, tg_group_id=TG_GROUP_ID, name=name)
         msg = "快啲搵ADMIN幫你approve"
 
-    context.bot.send_message(chat_id=update.effective_chat.id, text=msg)
+    context.bot.send_message(chat_id=tg_id, text=msg)
+
+
+def get_footprint(tg_id):
+    try:
+        return FOOTPRINT[tg_id]
+    except KeyError:
+        return None
 
 
 def handle_member(update, context):
-    LOGGER.warning(update)
-    LOGGER.info(update['message']['chat']['id'])
-    db_member = member.find(tg_id=update['message']['chat']['id'])
+    tg_id = str(update.effective_user.id).strip()
 
-    context.bot.send_message(chat_id=update.effective_chat.id, text="hello world")
+    if get_footprint(tg_id):
+        _handle_member(update, context, tg_id)
+
+    else:
+        keyboard = [
+            [InlineKeyboardButton("睇/改某成員資料", callback_data='detail'),
+             InlineKeyboardButton("approve", callback_data='approve')],
+            [InlineKeyboardButton("＋成員", callback_data='create'),
+             InlineKeyboardButton("- 成員", callback_data='delete')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        db_members = member.list_by_tg_group_id(TG_GROUP_ID)
+        member_list = '\n'.join([m['name'] for m in db_members])
+
+        update.message.reply_text(member_list, reply_markup=reply_markup)
+
+
+
+
+
+def handle_me(update, context):
+    tg_id = str(update.effective_user.id).strip()
+    _handle_member(update, context, tg_id)
+
+
+def _handle_member(update, context, tg_id):
+    return
 
 
 def handle_event(update, context):
@@ -101,6 +134,13 @@ def handle_input(update, context):
 
 
 def error(update, context):
-    traceback.print_exc()
-    LOGGER.warning(context.error)
-    # context.bot.send_message(chat_id=update.effective_chat.id, text=str(context.error))
+    try:
+        traceback.print_exc()
+        tg_id = update.effective_user.id
+        context.bot.send_message(chat_id=tg_id, text=str(context.error))
+        for sa_tg_id in SUPER_ADMIN_TG_IDS:
+            context.bot.send_message(chat_id=sa_tg_id, text=f"user({tg_id}): {context.error}")
+    except Exception as e:
+        traceback.print_exc()
+
+

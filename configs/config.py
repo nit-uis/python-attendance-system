@@ -26,7 +26,9 @@ def init():
         config.read("./configs/minerva.ini")
     else:
         raise SystemExit('Error: 1 invalid environment argument.')
-    
+
+    return args.env
+
 
 def reset():
     global config
