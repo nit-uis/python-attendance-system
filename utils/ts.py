@@ -34,6 +34,13 @@ def fromUtcnowToString(format):
     return datetime.utcfromtimestamp(time()).strftime(format)
 
 
+def to_string(ts, format=END_DATE_FORMAT):
+    try:
+        return datetime.utcfromtimestamp(ts).strftime(format)
+    except:
+        return datetime.utcfromtimestamp(ts/1000).strftime(format)
+
+
 def compareTimestampWithUtcnow(ts):
     return (datetime.utcnow()-ts).seconds
 

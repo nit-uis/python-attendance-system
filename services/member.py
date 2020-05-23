@@ -15,24 +15,31 @@ def init():
 
 # def authorize(tg_id):
 
-def find(tg_id, tg_group_id):
-    return memberdao.find(tg_id, tg_group_id)
+def find_by_tg_id(tg_group_id, tg_id, status):
+    return memberdao.find_by_tg_id(tg_group_id=tg_group_id, tg_id=tg_id, status=status)
 
 
-def find_by_member_type(tg_id, tg_group_id, member_type):
-    if not member_type:
+def find_by_type(tg_group_id, tg_id, mtype, status):
+    if not mtype:
         return None
 
     if tg_group_id:
-        return memberdao.find_by_member_type_and_tg_group_id(str(tg_group_id), member_type)
+        return memberdao.find_by_type(tg_group_id=str(tg_group_id), mtype=mtype, status=status)
     elif tg_id:
-        return memberdao.find_by_member_type_and_tg_id(str(tg_id), member_type)
+        return memberdao.find_by_tg_id_and_type(tg_id=str(tg_id), mtype=mtype, status=status)
     else:
         return None
 
 
-def list_by_tg_group_id(tg_group_id):
-    return memberdao.find_by_tg_group_id(tg_group_id)
+def find_by_name(tg_group_id, name: str, status):
+    if not tg_group_id or not name:
+        return None
+
+    return memberdao.find_by_name(tg_group_id=str(tg_group_id), name=name.lower().strip(), status=status)
+
+
+def list(tg_group_id, status):
+    return memberdao.find(tg_group_id=tg_group_id, status=status)
 
 
 
@@ -45,7 +52,7 @@ def list_by_tg_group_id(tg_group_id):
 
 
 
-def create(tg_id, tg_group_id, name):
+def create(tg_group_id, tg_id, name):
     if not tg_id or not tg_group_id or not name:
         raise MemberError(f"cannot create member, tg_id={tg_id}, tg_group_id={tg_group_id}, name={name}")
 
@@ -59,3 +66,7 @@ def create(tg_id, tg_group_id, name):
       "updateAt": ts.get_utc_now_in_ms(),
       "status": "INACTIVE"
     })
+
+
+def update_status(tg_group_id, tg_id, status):
+    memberdao.update_status(tg_group_id=tg_group_id, tg_id=tg_id, status=status)
