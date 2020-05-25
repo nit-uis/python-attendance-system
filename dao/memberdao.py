@@ -84,7 +84,10 @@ def create(member: dict):
 
 
 def update_status(tg_group_id, tg_id, status):
-    CLIENT.run("""
+    results = CLIENT.run("""
             MATCH (member:TgMember{tgGroupId: {tg_group_id}, tgId: {tg_id}})
             SET member.status = {status}
+            RETURN member
         """, {"tg_group_id": tg_group_id, "tg_id": tg_id, "status": status})
+
+    return [i['member'] for i in results]

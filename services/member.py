@@ -69,4 +69,4 @@ def create(tg_group_id, tg_id, name):
 
 
 def update_status(tg_group_id, tg_id, status):
-    memberdao.update_status(tg_group_id=tg_group_id, tg_id=tg_id, status=status)
+    return memberdao.update_status(tg_group_id=tg_group_id, tg_id=tg_id, status=status)

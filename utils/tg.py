@@ -117,9 +117,8 @@ def handle_member(update, context):
     tg_id = update.effective_user.id
 
     keyboard = [
-        [InlineKeyboardButton("＋成員", callback_data='create'),
-         InlineKeyboardButton("- 成員", callback_data='delete')],
-        [InlineKeyboardButton("睇某成員資料", callback_data='detail')]
+        [InlineKeyboardButton("睇某成員資料", callback_data='detail'),
+         InlineKeyboardButton("-成員", callback_data='delete')],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -148,6 +147,20 @@ def _handle_member(update, context):
             context.bot.send_message(chat_id=tg_id, text=text)
         else:
             context.bot.send_message(chat_id=tg_id, text="要睇邊個？(請輸入成員名)")
+    elif "delete" == fp['subcommand']:
+        if 'input' in fp and fp['input']:
+            name = fp['input']
+            db_members = member.find_by_name(tg_group_id=TG_GROUP_ID, name=name, status=["ACTIVE"])
+
+            if db_members:
+                db_members = member.update_status(tg_group_id=TG_GROUP_ID, tg_id=db_members[0]['tgId'], status="INACTIVE")
+                text = formatter.format_member(db_members[0])
+                # clear_footprint(tg_id)
+            else:
+                text = "冇呢個人wo..打多次個名?"
+            context.bot.send_message(chat_id=tg_id, text=text)
+        else:
+            context.bot.send_message(chat_id=tg_id, text="要減走邊個？(請輸入成員名)")
 
     elif "approve" == fp['subcommand']:
         if 'target_tg_id' in fp and fp['target_tg_id'] and 'input' in fp and fp['input']:
