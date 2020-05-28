@@ -8,6 +8,7 @@ ONE_DAY_SECONDS = ONE_HOUR_SECONDS * 24
 ONE_MONTH_SECONDS = ONE_DAY_SECONDS * 30
 
 END_DATE_FORMAT = '%Y-%m-%d %z'
+DATE_WITH_WEEK_FORMAT = '%Y-%m-%d (%a)'
 
 
 # using
@@ -36,6 +37,7 @@ def fromUtcnowToString(format):
 
 def to_string(ts, format=END_DATE_FORMAT):
     try:
+        ts = int(ts)
         return datetime.utcfromtimestamp(ts).strftime(format)
     except:
         return datetime.utcfromtimestamp(ts/1000).strftime(format)

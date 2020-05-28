@@ -2,7 +2,7 @@ import schedule
 import time
 from configs import config
 from services import event, member, membergroup, report
-from utils import log, tg
+from utils import log, tg, formatter
 from db import neo4j
 from dao import membergroupdao, settingdao, reportdao, memberdao, eventdao
 import os
@@ -31,12 +31,14 @@ def init():
 
 if __name__ == '__main__':
     init()
+    # tg.daily_msg()
 
     LOGGER.info(f"started, GIT_TAG={os.environ['GIT_TAG'] if 'GIT_TAG' in os.environ else ''}")
     LOGGER.info(f"target neo4j host: {config.get_string('neo4j', 'host')}")
 
     schedule.every(2).seconds.do(tg.get_updates)
     schedule.every().day.at("04:00").do(report.get_monthly_report)
+    schedule.every().day.at("04:01").do(tg.daily_msg)
 
     config.reset()
 

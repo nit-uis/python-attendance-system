@@ -16,6 +16,9 @@ def init():
 # def authorize(tg_id):
 
 def find_by_tg_id(tg_group_id, tg_id, status):
+    if not tg_group_id or not tg_id:
+        return None
+
     return memberdao.find_by_tg_id(tg_group_id=tg_group_id, tg_id=tg_id, status=status)
 
 
@@ -39,6 +42,9 @@ def find_by_name(tg_group_id, name: str, status):
 
 
 def list(tg_group_id, status):
+    if not tg_group_id:
+        return None
+
     return memberdao.find(tg_group_id=tg_group_id, status=status)
 
 
@@ -69,4 +75,7 @@ def create(tg_group_id, tg_id, name):
 
 
 def update_status(tg_group_id, tg_id, status):
+    if not tg_id or not tg_group_id:
+        raise MemberError(f"cannot update member status, tg_id={tg_id}, tg_group_id={tg_group_id}")
+
     return memberdao.update_status(tg_group_id=tg_group_id, tg_id=tg_id, status=status)
