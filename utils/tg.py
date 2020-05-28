@@ -272,8 +272,8 @@ def handle_button(update, context):
     query = update.callback_query
     print(query)
     print(update)
-    # chat_type = update['message']['chat']['type']
-    if True:  #"group" in chat_type:
+    chat_type = update['message']['chat']['type']
+    if "group" in chat_type:
         fp = query.data.split(";")
         data_map = {
             'member_id': tg_id,
