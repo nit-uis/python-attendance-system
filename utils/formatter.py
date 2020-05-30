@@ -83,7 +83,7 @@ def format_event_type(mtype):
 # 未知:
 #
 # 雲遊太空中: MaN
-def format_event(event, expand: bool = False):
+def format_event(event, expand: bool):
     who_bring_ball = set()
     who_get_ball = set()
     who_go = set()

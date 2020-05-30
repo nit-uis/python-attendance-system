@@ -10,14 +10,26 @@ def init():
     LOGGER = log.get_logger("event")
 
 
-def find_by_event_id(tg_group_id, event_id, status):
+def find_by_id(tg_group_id, event_id, status):
     if not tg_group_id or not event_id:
         return None
 
-    return eventdao.find_by_event_id(tg_group_id=tg_group_id, event_id=event_id, status=status)
+    return eventdao.find_by_id(tg_group_id=tg_group_id, event_id=event_id, status=status)
 
 
-def find_active(tg_group_id):
+# date in format yyyy-MM-dd +0800
+def find_by_date(tg_group_id, date: str, status):
+    if not tg_group_id or not date or len(date) != 16:
+        return None
+
+    start = ts.to_seconds(date) * 1000
+    end = (start + ts.ONE_DAY_SECONDS) * 1000
+    print(start, end)
+
+    return eventdao.find_by_start_and_end(tg_group_id=tg_group_id, start=start, end=end, status=status)
+
+
+def find_coming(tg_group_id):
     if not tg_group_id:
         return None
 
@@ -31,3 +43,24 @@ def take_attendance(tg_group_id, event_id, member_id, attendance, reason):
         raise EventError(f"invalid attendance({attendance})")
 
     eventdao.take_attendance(tg_group_id=tg_group_id, event_id=event_id, member_id=member_id, attendance=attendance, reason=str(reason).strip(), status=["ACTIVE"])
+
+
+def update_status(tg_group_id, event_id, status):
+    if not event_id or not tg_group_id:
+        raise EventError(f"cannot update event status, event_id={event_id}, tg_group_id={tg_group_id}")
+
+    return eventdao.update_status(tg_group_id=tg_group_id, event_id=event_id, status=status)
+
+
+def update_start_time(tg_group_id, event_id, start_time):
+    if not event_id or not tg_group_id:
+        raise EventError(f"cannot update event start time, event_id={event_id}, tg_group_id={tg_group_id}")
+
+    return eventdao.update_start_time(tg_group_id=tg_group_id, event_id=event_id, time=start_time)
+
+
+def update_end_time(tg_group_id, event_id, end_time):
+    if not event_id or not tg_group_id:
+        raise EventError(f"cannot update event end time, event_id={event_id}, tg_group_id={tg_group_id}")
+
+    return eventdao.update_end_time(tg_group_id=tg_group_id, event_id=event_id, time=end_time)

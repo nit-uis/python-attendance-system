@@ -137,3 +137,40 @@ MATCH (m:TgMember{uuid: line.tgMemberId}), (e:TgEvent{uuid: line.tgEventId})
 WHERE line.r = "BRING_BALL"
 MERGE (m)-[:BRING_BALL]->(e)
 RETURN *
+
+
+
+--
+
+
+
+
+structure update
+
+MATCH (n:TgEvent)-[b:BRING_BALL]-(m:TgMember)
+MATCH (n)-[r:JOIN]-(m)
+SET r.bring = true
+
+MATCH (n:TgEvent)-[b:GET_BALL]-(m:TgMember)
+MATCH (n)-[r:JOIN]-(m)
+SET r.get = true
+
+MATCH (n:TgEvent)-[:NOT_SURE]-(m:TgMember)
+MERGE (m)-[r:JOIN]->(n)
+SET r.name = "NOT_SURE", r.createAt = 0, r.bring = false, r.get = false, r.reason = ""
+RETURN r
+
+MATCH (n:TgEvent)-[:GO]-(m:TgMember)
+MERGE (m)-[r:JOIN]->(n)
+SET r.name = "GO", r.createAt = 0, r.bring = false, r.get = false, r.reason = ""
+RETURN r
+
+MATCH (n:TgEvent)-[:NOT_GO]-(m:TgMember)
+MERGE (m)-[r:JOIN]->(n)
+SET r.name = "NOT_GO", r.createAt = 0, r.bring = false, r.get = false, r.reason = ""
+RETURN r
+
+MATCH (n:TgMember)
+WHERE NOT EXISTS((n)--(:TgMemberGroup))
+SET n.type = "GUEST"
+RETURN n.name

@@ -9,11 +9,12 @@ ONE_MONTH_SECONDS = ONE_DAY_SECONDS * 30
 
 END_DATE_FORMAT = '%Y-%m-%d %z'
 DATE_WITH_WEEK_FORMAT = '%Y-%m-%d (%a)'
+LOCAL_DATE_FORMAT = '%Y-%m-%d'
 
 
 # using
 # local run & dev/uat run on cloud: the same timestamp
-def fromStringToSeconds(str, format=END_DATE_FORMAT):
+def to_seconds(str, format=END_DATE_FORMAT):
     try:
         return int('%.0f' % (datetime.strptime(str, format).timestamp()))
     except Exception as e:
@@ -22,7 +23,7 @@ def fromStringToSeconds(str, format=END_DATE_FORMAT):
 
 def get_second_by_year(year):
     try:
-        return fromStringToSeconds(f"{year.strip()}-01-01 +0000", END_DATE_FORMAT)
+        return to_seconds(f"{year.strip()}-01-01 +0000", END_DATE_FORMAT)
     except Exception as e:
         return 0
 
@@ -71,5 +72,5 @@ def getHknowSeconds():
 
 if __name__ == "__main__":
     print(f'current getUtcnowTs={getUtcnowTs()}, getUtcnowSeconds={getUtcnowSeconds()}, getHknowSeconds={getHknowSeconds()}')
-    print(fromStringToSeconds("2019/09/09 19:50 +0800", "%Y/%m/%d %H:%M %z"))
+    print(to_seconds("2019/09/09 19:50 +0800", "%Y/%m/%d %H:%M %z"))
 
