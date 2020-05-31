@@ -13,3 +13,7 @@ class MemberGroupError(Error):
 
 class EventError(Error):
     pass
+
+
+class Unauthorized(Error):
+    pass

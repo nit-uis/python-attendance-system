@@ -83,11 +83,11 @@ def create(member: dict):
                {"tg_group_id": member['tgGroupId'], "status": "ACTIVE"})
 
 
-def update_status(tg_group_id: str, tg_id: str, status: list):
+def update_status(tg_group_id: str, member_id: str, status: list):
     results = CLIENT.run("""
-            MATCH (member:TgMember{tgGroupId: {tg_group_id}, tgId: {tg_id}})
+            MATCH (member:TgMember{tgGroupId: {tg_group_id}, uuid: {member_id}})
             SET member.status = {status}, member.updateAt = timestamp()
             RETURN member
-        """, {"tg_group_id": tg_group_id, "tg_id": tg_id, "status": status})
+        """, {"tg_group_id": tg_group_id, "member_id": member_id, "status": status})
 
     return [i['member'] for i in results]
