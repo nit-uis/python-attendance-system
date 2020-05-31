@@ -8,6 +8,7 @@
 #   "createAt": 1548086346883,
 #   "status": "ACTIVE"
 # }
+import re
 import textwrap
 from itertools import groupby
 from operator import itemgetter
@@ -31,7 +32,7 @@ def format_member(member):
 
     return textwrap.dedent(f"""
         {member['name']} ({mtype})
-        加入日期: {ts.to_string(member['createAt'])}
+        加入日期: {ts.to_string_hkt(member['createAt'])}
         狀態: {status}
     """).strip()
 
@@ -50,15 +51,28 @@ def format_member_type(mtype):
         return ""
 
 
-def format_event_type(mtype):
-    if "PRACTICE" == mtype:
+def format_event_type(etype):
+    if "PRACTICE" == etype:
         return "練習"
-    elif "COMPETITION" == mtype:
+    elif "COMPETITION" == etype:
         return "比賽"
-    elif "FDLY" == mtype:
-        return "友誼賽"
-    elif "GATHERING" == mtype:
+    elif "FDLY" == etype:
+        return "FDLY"
+    elif "GATHERING" == etype:
         return "聚會"
+    else:
+        return ""
+
+
+def deformat_event_type(etype):
+    if "練習" in etype:
+        return "PRACTICE"
+    elif "比賽" in etype:
+        return "COMPETITION"
+    elif re.search(r'[Ff][Dd][Ll][Yy]', etype) or "友誼賽" in etype:
+        return "FDLY"
+    elif "聚會" in etype or "玩" in etype:
+        return "GATHERING"
     else:
         return ""
 
@@ -137,7 +151,7 @@ def format_event(event, expand: bool):
 
     return textwrap.dedent(f"""
             {event['name']} ({format_event_type(event['type'])}) 
-            {ts.to_string(event['date'], DATE_WITH_WEEK_FORMAT)} {event['venue']} {event['start']}-{event['end']}
+            {ts.to_string_hkt(event['date'], DATE_WITH_WEEK_FORMAT)} {event['venue']} {event['start']}-{event['end']}
             
             帶波黎({', '.join(who_bring_ball)}), 拎波走({', '.join(who_get_ball)})
 

@@ -5,6 +5,7 @@ from time import time
 ONE_MINUTE_SECONDS = 60
 ONE_HOUR_SECONDS = ONE_MINUTE_SECONDS * 60
 ONE_DAY_SECONDS = ONE_HOUR_SECONDS * 24
+EIGHT_HOUR_SECONDS = ONE_HOUR_SECONDS * 8
 ONE_MONTH_SECONDS = ONE_DAY_SECONDS * 30
 
 END_DATE_FORMAT = '%Y-%m-%d %z'
@@ -19,6 +20,16 @@ def to_seconds(str, format=END_DATE_FORMAT):
         return int('%.0f' % (datetime.strptime(str, format).timestamp()))
     except Exception as e:
         return 0
+
+
+def to_milliseconds(str, format=END_DATE_FORMAT):
+    return to_seconds(str, format) * 1000
+
+
+# from hkt
+# for ts without zone info
+def to_milliseconds_utc(str, format=END_DATE_FORMAT):
+    return (to_seconds(str, format) - EIGHT_HOUR_SECONDS) * 1000
 
 
 def get_second_by_year(year):
@@ -36,12 +47,23 @@ def fromUtcnowToString(format):
     return datetime.utcfromtimestamp(time()).strftime(format)
 
 
+def is_milliseconds(ts):
+    ts = str(ts).strip()
+    return len(ts) > 11
+
+
 def to_string(ts, format=END_DATE_FORMAT):
-    try:
-        ts = int(ts)
+    if is_milliseconds(ts):
+        return datetime.utcfromtimestamp(ts / 1000).strftime(format)
+    else:
         return datetime.utcfromtimestamp(ts).strftime(format)
-    except:
-        return datetime.utcfromtimestamp(ts/1000).strftime(format)
+
+
+def to_string_hkt(ts, format=END_DATE_FORMAT):
+    if is_milliseconds(ts):
+        return to_string(ts + EIGHT_HOUR_SECONDS * 1000, format)
+    else:
+        return to_string(ts + EIGHT_HOUR_SECONDS, format)
 
 
 def compareTimestampWithUtcnow(ts):

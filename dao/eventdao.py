@@ -114,3 +114,23 @@ def update_end_time(tg_group_id: str, event_id: str, time: str):
         """, {"tg_group_id": tg_group_id, "event_id": event_id, "time": time})
 
     return [i['event'] for i in results]
+
+
+def update_type(tg_group_id: str, event_id: str, etype: str):
+    results = CLIENT.run("""
+            MATCH (event:TgEvent{uuid: {event_id}, status: "ACTIVE"})--(memberGroup:TgMemberGroup{tgGroupId: {tg_group_id}, status:"ACTIVE"}) 
+            SET event.type = {etype}, event.updateAt = timestamp()
+            RETURN event
+        """, {"tg_group_id": tg_group_id, "event_id": event_id, "etype": etype})
+
+    return [i['event'] for i in results]
+
+
+def update_date(tg_group_id: str, event_id: str, date: str):
+    results = CLIENT.run("""
+            MATCH (event:TgEvent{uuid: {event_id}, status: "ACTIVE"})--(memberGroup:TgMemberGroup{tgGroupId: {tg_group_id}, status:"ACTIVE"}) 
+            SET event.date = {date}, event.updateAt = timestamp()
+            RETURN event
+        """, {"tg_group_id": tg_group_id, "event_id": event_id, "date": date})
+
+    return [i['event'] for i in results]

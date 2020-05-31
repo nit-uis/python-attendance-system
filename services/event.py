@@ -22,8 +22,8 @@ def find_by_date(tg_group_id, date: str, status):
     if not tg_group_id or not date or len(date) != 16:
         return None
 
-    start = ts.to_seconds(date) * 1000
-    end = (start + ts.ONE_DAY_SECONDS) * 1000
+    start = ts.to_milliseconds(date)
+    end = (start + (ts.ONE_DAY_SECONDS + 1) * 1000)
     print(start, end)
 
     return eventdao.find_by_start_and_end(tg_group_id=tg_group_id, start=start, end=end, status=status)
@@ -53,14 +53,30 @@ def update_status(tg_group_id, event_id, status):
 
 
 def update_start_time(tg_group_id, event_id, start_time):
-    if not event_id or not tg_group_id:
+    if not event_id or not tg_group_id or not start_time:
         raise EventError(f"cannot update event start time, event_id={event_id}, tg_group_id={tg_group_id}")
 
     return eventdao.update_start_time(tg_group_id=tg_group_id, event_id=event_id, time=start_time)
 
 
 def update_end_time(tg_group_id, event_id, end_time):
-    if not event_id or not tg_group_id:
+    if not event_id or not tg_group_id or not end_time:
         raise EventError(f"cannot update event end time, event_id={event_id}, tg_group_id={tg_group_id}")
 
     return eventdao.update_end_time(tg_group_id=tg_group_id, event_id=event_id, time=end_time)
+
+
+def update_type(tg_group_id, event_id, etype):
+    if not event_id or not tg_group_id or not etype:
+        raise EventError(f"cannot update event type, event_id={event_id}, tg_group_id={tg_group_id}")
+
+    return eventdao.update_type(tg_group_id=tg_group_id, event_id=event_id, etype=etype)
+
+
+def update_date(tg_group_id, event_id, date: str):
+    if not event_id or not tg_group_id or len(date) != 16:
+        raise EventError(f"cannot update event date, event_id={event_id}, tg_group_id={tg_group_id}")
+
+    date = ts.to_milliseconds(date)
+
+    return eventdao.update_date(tg_group_id=tg_group_id, event_id=event_id, date=date)
