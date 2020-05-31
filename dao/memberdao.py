@@ -83,6 +83,16 @@ def create(member: dict):
                {"tg_group_id": member['tgGroupId'], "status": "ACTIVE"})
 
 
+def create_guest(member: dict):
+    member_json = re.sub(r'\'(\w+)\':', r'\1:', str(member))
+    LOGGER.debug(f"member_json={member_json}")
+
+    results = CLIENT.run(f"CREATE (member:TgMember{member_json}) RETURN member",
+               {"tg_group_id": member['tgGroupId'], "status": "ACTIVE"})
+
+    return [i['member'] for i in results]
+
+
 def update_status(tg_group_id: str, member_id: str, status: list):
     results = CLIENT.run("""
             MATCH (member:TgMember{tgGroupId: {tg_group_id}, uuid: {member_id}})

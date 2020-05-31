@@ -317,20 +317,20 @@ def _handle_event(update, context):
         _handle_event_time(update, context, db_members[0], start=True)
     elif "end" == fp['subcommand']:
         _handle_event_time(update, context, db_members[0], start=False)
-    elif "type" == fp['subcommand']:  # todo
+    elif "type" == fp['subcommand']:
         _handle_event_type(update, context, db_members[0])
-    elif "date" == fp['subcommand']:  # todo
+    elif "date" == fp['subcommand']:
         _handle_event_date(update, context, db_members[0])
-    elif "venue" == fp['subcommand']:  # todo
-        pass
-    elif "guest" == fp['subcommand']:  # todo
-        pass
-    elif "go" == fp['subcommand']:  # todo
-        pass
-    elif "not_go" == fp['subcommand']:  # todo
-        pass
-    elif "not_sure" == fp['subcommand']:  # todo
-        pass
+    elif "venue" == fp['subcommand']:
+        _handle_event_venue(update, context, db_members[0])
+    elif "guest" == fp['subcommand']:
+        _handle_event_guest(update, context, db_members[0])
+    elif "go" == fp['subcommand']:
+        _handle_event_attendance(update, context, db_members[0], "GO")
+    elif "not_go" == fp['subcommand']:
+        _handle_event_attendance(update, context, db_members[0], "NOT_GO")
+    elif "not_sure" == fp['subcommand']:
+        _handle_event_attendance(update, context, db_members[0], "NOT_SURE")
     elif "bring" == fp['subcommand']:  # todo
         pass
     elif "get" == fp['subcommand']:  # todo
@@ -546,7 +546,7 @@ def _handle_event_date(update, context, request_member):
 
     # validate
     if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to send some events")
+        raise Unauthorized(f"{request_member['name']} is trying to update some events")
     if 'event_id' not in fp or not fp['event_id']:
         context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
         return
@@ -563,6 +563,112 @@ def _handle_event_date(update, context, request_member):
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError("cannot update event type")
+
+    # update footprint
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+
+
+def _handle_event_venue(update, context, request_member):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    fp = get_footprint(tg_id)
+
+    # validate
+    if not member_service.is_admin(request_member['type']):
+        raise Unauthorized(f"{request_member['name']} is trying to update some events")
+    if 'event_id' not in fp or not fp['event_id']:
+        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+        return
+    if 'input' not in fp or not fp['input']:
+        context.bot.send_message(chat_id=tg_id, text="邊度? (Eg. 花墟/巴富街/花園街體育館/其他地方)")
+        return
+
+    event_id = fp['event_id']
+    venue = fp['input'].replace(" ", "")
+
+    db_events = event_service.update_venue(tg_group_id=TG_GROUP_ID, event_id=event_id, venue=venue)
+    if db_events:
+        context.bot.send_message(chat_id=tg_id, text=f"轉左去 {fp['input']}")
+    else:
+        context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+        raise EventError("cannot update event venue")
+
+    # update footprint
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+
+
+def _handle_event_guest(update, context, request_member):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    fp = get_footprint(tg_id)
+
+    # validate
+    if not member_service.is_admin(request_member['type']):
+        raise Unauthorized(f"{request_member['name']} is trying to update some events")
+    if 'event_id' not in fp or not fp['event_id']:
+        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+        return
+    if 'input' not in fp or not fp['input']:
+        context.bot.send_message(chat_id=tg_id, text="邊個? (可以打多幾個名, Eg: lydia, tszwai)")
+        return
+
+    event_id = fp['event_id']
+    names = fp['input'].split(",")
+    if len(names) == 1:
+        names = fp['input'].split("，")
+
+    for name in names:
+        name = name.strip()
+        db_guest = member_service.find_or_create_guest(tg_group_id=TG_GROUP_ID, name=name, status=["ACTIVE"])
+        if not db_guest:
+            context.bot.send_message(chat_id=tg_id, text=f"{name} 跟操失敗")
+            continue
+
+        db_events = event_service.take_attendance(tg_group_id=TG_GROUP_ID, event_id=event_id, member_id=db_guest['uuid'], attendance="GO", reason='')
+        if db_events:
+            context.bot.send_message(chat_id=tg_id, text=f"轉左去 {fp['input']}")
+        else:
+            context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+            raise EventError("cannot update event venue")
+
+    # update footprint
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+
+
+def _handle_event_attendance(update, context, request_member, attendance):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    fp = get_footprint(tg_id)
+
+    # validate
+    if not member_service.is_admin(request_member['type']):
+        raise Unauthorized(f"{request_member['name']} is trying to update some events")
+    if 'event_id' not in fp or not fp['event_id']:
+        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+        return
+    if 'input' not in fp or not fp['input']:
+        context.bot.send_message(chat_id=tg_id, text="邊個? (可以打多幾個名, Eg: lydia, tszwai)")
+        return
+
+    event_id = fp['event_id']
+    names = fp['input'].split(",")
+    if len(names) == 1:
+        names = fp['input'].split("，")
+
+    for name in names:
+        name = name.strip()
+        db_members = member_service.find_by_name(tg_group_id=TG_GROUP_ID, name=name, status=["ACTIVE"])
+        if not db_members:
+            context.bot.send_message(chat_id=tg_id, text=f"加唔到 {name}")
+            continue
+
+        db_events = event_service.take_attendance(tg_group_id=TG_GROUP_ID, event_id=event_id,
+                                                  member_id=db_members[0]['uuid'], attendance=attendance, reason='')
+        if db_events:
+            context.bot.send_message(chat_id=tg_id, text=f"加左 {name}")
+        else:
+            context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+            raise EventError("cannot update event member attendance")
 
     # update footprint
     set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})

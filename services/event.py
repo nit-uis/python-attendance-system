@@ -80,3 +80,10 @@ def update_date(tg_group_id, event_id, date: str):
     date = ts.to_milliseconds(date)
 
     return eventdao.update_date(tg_group_id=tg_group_id, event_id=event_id, date=date)
+
+
+def update_venue(tg_group_id, event_id, venue: str):
+    if not event_id or not tg_group_id or not venue:
+        raise EventError(f"cannot update event venue, event_id={event_id}, tg_group_id={tg_group_id}")
+
+    return eventdao.update_venue(tg_group_id=tg_group_id, event_id=event_id, venue=venue)
