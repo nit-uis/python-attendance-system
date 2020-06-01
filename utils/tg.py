@@ -230,6 +230,7 @@ def _handle_member_delete(update, context, request_member):
         return
     elif 'Y' not in fp['input'] and 'y' not in fp['input']:
         context.bot.send_message(chat_id=tg_id, text="唔delete lu")
+        set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
         return
 
     member_id = fp['member_id']
@@ -260,6 +261,7 @@ def _handle_member_approve(update, context, request_member):
         return
     elif 'Y' not in fp['input'] and 'y' not in fp['input']:
         context.bot.send_message(chat_id=tg_id, text="已經reject了")
+        set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
         return
 
     member_id = fp['member_id']
@@ -476,6 +478,7 @@ def _handle_event_delete(update, context, request_member):
         return
     elif 'Y' not in fp['input'] and 'y' not in fp['input']:
         context.bot.send_message(chat_id=tg_id, text="唔delete lu")
+        set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
         return
 
     event_id = fp['event_id']
