@@ -46,7 +46,7 @@ def find_coming(tg_group_id):
 
 
 
-def create(tg_group_id):
+def create(tg_group_id, event_id=''):
     if not tg_group_id:
         raise EventError(f"cannot create event, tg_group_id={tg_group_id}")
 
@@ -59,15 +59,32 @@ def create(tg_group_id):
     #   "createAt": 1548086343683,
     #   "status": "ACTIVE"
     # }
-    event = {
-      "date": ts.get_utc_now_in_ms() + ts.ONE_WEEK_SECONDS * 1000,
-      "name": "夠鐘執波了",
-      "type": "PRACTICE",
-      "uuid": str(uuid.uuid4()),
-      "createAt": ts.get_utc_now_in_ms(),
-      "updateAt": ts.get_utc_now_in_ms(),
-      "status": "ACTIVE"
-    }
+    db_events = None
+    if event_id:
+        db_events = eventdao.find_by_id(tg_group_id=tg_group_id, event_id=event_id, status=["ACTIVE"])
+        if db_events:
+            db_events = db_events[0]
+
+    if db_events:
+        event = {
+            "date": db_events['date'] + ts.ONE_WEEK_SECONDS * 1000,
+            "name": db_events['name'] + "*",
+            "type": db_events['type'],
+            "uuid": str(uuid.uuid4()),
+            "createAt": ts.get_utc_now_in_ms(),
+            "updateAt": ts.get_utc_now_in_ms(),
+            "status": "ACTIVE"
+        }
+    else:
+        event = {
+            "date": ts.get_utc_now_in_ms() + ts.ONE_WEEK_SECONDS * 1000,
+            "name": "夠鐘執波了",
+            "type": "PRACTICE",
+            "uuid": str(uuid.uuid4()),
+            "createAt": ts.get_utc_now_in_ms(),
+            "updateAt": ts.get_utc_now_in_ms(),
+            "status": "ACTIVE"
+        }
     venue = eventdao.find_most_common_venues(tg_group_id=tg_group_id, status=["ACTIVE"])
     if venue:
         venue = venue[0]['name']
@@ -143,6 +160,13 @@ def update_date(tg_group_id, event_id, date: str):
     date = ts.to_milliseconds(date)
 
     return eventdao.update_date(tg_group_id=tg_group_id, event_id=event_id, date=date)
+
+
+def update_name(tg_group_id, event_id, name: str):
+    if not event_id or not tg_group_id or not name:
+        raise EventError(f"cannot update event name, event_id={event_id}, tg_group_id={tg_group_id}")
+
+    return eventdao.update_name(tg_group_id=tg_group_id, event_id=event_id, name=name)
 
 
 def update_venue(tg_group_id, event_id, venue: str):

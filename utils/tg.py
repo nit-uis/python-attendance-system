@@ -328,6 +328,8 @@ def _handle_event(update, context):
         _handle_event_type(update, context, db_members[0])
     elif "date" == fp['subcommand']:
         _handle_event_date(update, context, db_members[0])
+    elif "name" == fp['subcommand']:
+        _handle_event_name(update, context, db_members[0])
     elif "venue" == fp['subcommand']:
         _handle_event_venue(update, context, db_members[0])
     elif "guest" == fp['subcommand']:
@@ -350,7 +352,6 @@ def _handle_event(update, context):
         _handle_event_duplicate(update, context, db_members[0])
 
 
-# fixme when clear event_id in fp?
 def _handle_event_detail(update, context, request_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
@@ -379,7 +380,6 @@ def _handle_event_detail(update, context, request_member):
         context.bot.send_message(chat_id=tg_id, text="打多次日期?")
         return
     elif len(db_events) > 1:
-        # fixme what if same date have 2 event? let user choose?
         keyboard = [[InlineKeyboardButton(formatter.format_event(i, 1), callback_data=i['uuid'])] for i in db_events]
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.send_message(chat_id=tg_id, text="邊個?", reply_markup=reply_markup)
@@ -389,11 +389,11 @@ def _handle_event_detail(update, context, request_member):
     text = formatter.format_event(db_events[0], expand=3)
     if member_service.is_admin(request_member['type']):
         keyboard = [
-            [InlineKeyboardButton('delete', callback_data='delete'),
+            [InlineKeyboardButton('改event種類', callback_data='type'),
              InlineKeyboardButton('幾點開始', callback_data='start'),
              InlineKeyboardButton('跟操', callback_data='guest'),
              ],
-            [InlineKeyboardButton('改event種類', callback_data='type'),
+            [InlineKeyboardButton('改名', callback_data='name'),
              InlineKeyboardButton('幾點完', callback_data='end'),
              InlineKeyboardButton('幫人禁<黎>', callback_data='go'),
              ],
@@ -405,8 +405,9 @@ def _handle_event_detail(update, context, request_member):
              InlineKeyboardButton('邊個<帶波>', callback_data='bring'),
              InlineKeyboardButton('<送人番火星>', callback_data='not_sure'),
              ],
-            [InlineKeyboardButton('duplicate', callback_data='duplicate'),
-             InlineKeyboardButton('sd去大gp', callback_data='send'),
+            [InlineKeyboardButton('delete', callback_data='delete'),
+             InlineKeyboardButton('duplicate', callback_data='duplicate'),
+             InlineKeyboardButton('sd to gp', callback_data='send'),
              InlineKeyboardButton('F5', callback_data='detail'),
              ],
         ]
@@ -583,6 +584,35 @@ def _handle_event_date(update, context, request_member):
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError("cannot update event type")
+
+    # update footprint
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+
+
+def _handle_event_name(update, context, request_member):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    fp = get_footprint(tg_id)
+
+    # validate
+    if not member_service.is_admin(request_member['type']):
+        raise Unauthorized(f"{request_member['name']} is trying to update some events")
+    if 'event_id' not in fp or not fp['event_id']:
+        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+        return
+    if 'input' not in fp or not fp['input']:
+        context.bot.send_message(chat_id=tg_id, text="想event叫咩名?")
+        return
+
+    event_id = fp['event_id']
+    name = fp['input']
+
+    db_events = event_service.update_name(tg_group_id=TG_GROUP_ID, event_id=event_id, name=name)
+    if db_events:
+        context.bot.send_message(chat_id=tg_id, text=f"轉左去 {fp['input']}")
+    else:
+        context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+        raise EventError("cannot update event name")
 
     # update footprint
     set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
@@ -774,6 +804,31 @@ def _handle_event_create(update, context, request_member):
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError("cannot create event")
+
+    # update footprint
+    # set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+
+
+def _handle_event_duplicate(update, context, request_member):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    fp = get_footprint(tg_id)
+
+    # validate
+    if not member_service.is_admin(request_member['type']):
+        raise Unauthorized(f"{request_member['name']} is trying to duplicate some events")
+    if 'event_id' not in fp or not fp['event_id']:
+        raise EventError("cannot duplicate event, due to empty event_id")
+
+    event_id = fp['event_id']
+    db_events = event_service.create(tg_group_id=TG_GROUP_ID, event_id=event_id)
+    if db_events:
+        set_footprint(tg_id=tg_id, command='event', data_map={'event_id': db_events[0]['uuid']})
+        _handle_event_detail(update, context, request_member)
+        # context.bot.send_message(chat_id=tg_id, text=formatter.format_event(db_events[0], expand=3))
+    else:
+        context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+        raise EventError("cannot duplicate event")
 
     # update footprint
     # set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
