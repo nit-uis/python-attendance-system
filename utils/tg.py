@@ -59,7 +59,7 @@ def daily_msg():
     db_events = event_service.find_coming(tg_group_id=TG_GROUP_ID)
 
     for event in db_events:
-        text = formatter.format_event(event, expand=True)
+        text = formatter.format_event(event, expand=3)
         event_id = event['uuid']
         keyboard = [
             [InlineKeyboardButton('黎', callback_data=f"event;attend;{event_id};GO"),
@@ -121,7 +121,7 @@ def clear_footprint(tg_id):
         pass
 
 
-def set_footprint(tg_id, command: str, subcommand: str = '', data_map: dict = dict()):
+def set_footprint(tg_id, command: str, subcommand: str = '', data_map: dict = dict(), clean_user_data: bool = False):
     tg_id = str(tg_id).strip()
     fp = get_footprint(tg_id)
     if not fp:
@@ -134,6 +134,11 @@ def set_footprint(tg_id, command: str, subcommand: str = '', data_map: dict = di
         fp['subcommand'] = subcommand
     for k, v in data_map.items():
         fp[k] = v
+
+    if clean_user_data:
+        for k, v in fp.items():
+            if k != "command" and k != "subcommand":
+                fp[k] = ''
 
     print(FOOTPRINT)
 
@@ -153,7 +158,7 @@ def handle_member(update, context):
     if not members:
         members = "冇晒人lu.."
 
-    set_footprint(tg_id, 'member', '')
+    set_footprint(tg_id=tg_id, command='member', subcommand='', clean_user_data=True)
 
     update.message.reply_text(members, reply_markup=reply_markup)
 
@@ -280,7 +285,6 @@ def handle_event(update, context):
 
     # find coming events
     db_events = event_service.find_coming(TG_GROUP_ID)
-    print(db_events)
 
     # list coming event dates in yyyy-MM-dd
     dates = '\n'.join([ts.to_string_hkt(i['date'], format=LOCAL_DATE_FORMAT) for i in db_events if i['date']])
@@ -288,12 +292,13 @@ def handle_event(update, context):
         dates = "最近冇event.."
 
     # set footprint
-    set_footprint(tg_id, 'event', '')
+    set_footprint(tg_id=tg_id, command='event', subcommand='', clean_user_data=True)
 
     # send msg with buttons, list all by EVENT_TYPE
     keyboard = [
-        [InlineKeyboardButton("睇某活動資料", callback_data='detail')],
-        [InlineKeyboardButton("所有活動種類", callback_data='list')]
+        [InlineKeyboardButton("睇唔同種類既event", callback_data='list')],
+        [InlineKeyboardButton("睇某event資料", callback_data='detail'),
+         InlineKeyboardButton("新event", callback_data='create')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(dates, reply_markup=reply_markup)
@@ -331,16 +336,19 @@ def _handle_event(update, context):
         _handle_event_attendance(update, context, db_members[0], "NOT_GO")
     elif "not_sure" == fp['subcommand']:
         _handle_event_attendance(update, context, db_members[0], "NOT_SURE")
-    elif "bring" == fp['subcommand']:  # todo
-        pass
-    elif "get" == fp['subcommand']:  # todo
-        pass
+    elif "bring" == fp['subcommand']:
+        _handle_event_ball(update, context, db_members[0], "BRING")
+    elif "get" == fp['subcommand']:
+        _handle_event_ball(update, context, db_members[0], "GET")
     elif "send" == fp['subcommand']:
         _handle_event_send(update, context, db_members[0])
-    elif "repeat" == fp['subcommand']:  # todo
-        pass
+    elif "create" == fp['subcommand']:
+        _handle_event_create(update, context, db_members[0])
+    elif "duplicate" == fp['subcommand']:
+        _handle_event_duplicate(update, context, db_members[0])
 
 
+# fixme when clear event_id in fp?
 def _handle_event_detail(update, context, request_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
@@ -351,13 +359,14 @@ def _handle_event_detail(update, context, request_member):
         context.bot.send_message(chat_id=tg_id, text="邊日? (Eg. 2020-05-31)")
         return
 
-    if fp['input']:
+    if 'input' in fp and fp['input']:
         date = f"{fp['input']} +0800"
         db_events = event_service.find_by_date(tg_group_id=TG_GROUP_ID, date=date, status=["ACTIVE"])
-    elif fp['date']:
+    elif 'date' in fp and fp['date']:
+        # fixme sometimes cant find existing events, time range has bugs?
         date = f"{fp['date']} +0800"
         db_events = event_service.find_by_date(tg_group_id=TG_GROUP_ID, date=date, status=["ACTIVE"])
-    elif fp['event_id']:
+    elif 'event_id' in fp and fp['event_id']:
         event_id = fp['event_id']
         db_events = event_service.find_by_id(tg_group_id=TG_GROUP_ID, event_id=event_id, status=["ACTIVE"])
     else:
@@ -367,15 +376,22 @@ def _handle_event_detail(update, context, request_member):
     if not db_events:
         context.bot.send_message(chat_id=tg_id, text="打多次日期?")
         return
+    elif len(db_events) > 1:
+        # fixme what if same date have 2 event? let user choose?
+        keyboard = [[InlineKeyboardButton(formatter.format_event(i, 1), callback_data=i['uuid'])] for i in db_events]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.send_message(chat_id=tg_id, text="邊個?", reply_markup=reply_markup)
+        set_footprint(tg_id=tg_id, command='event', data_map={"choose": "event_id", "input": ""})
+        return
 
-    text = formatter.format_event(db_events[0], expand=True)
+    text = formatter.format_event(db_events[0], expand=3)
     if member_service.is_admin(request_member['type']):
         keyboard = [
             [InlineKeyboardButton('delete', callback_data='delete'),
              InlineKeyboardButton('幾點開始', callback_data='start'),
              InlineKeyboardButton('跟操', callback_data='guest'),
              ],
-            [InlineKeyboardButton('改活動種類', callback_data='type'),
+            [InlineKeyboardButton('改event種類', callback_data='type'),
              InlineKeyboardButton('幾點完', callback_data='end'),
              InlineKeyboardButton('幫人禁<黎>', callback_data='go'),
              ],
@@ -387,8 +403,9 @@ def _handle_event_detail(update, context, request_member):
              InlineKeyboardButton('邊個<帶波>', callback_data='bring'),
              InlineKeyboardButton('<送人番火星>', callback_data='not_sure'),
              ],
-            [InlineKeyboardButton('repeat', callback_data='repeat'),
+            [InlineKeyboardButton('duplicate', callback_data='duplicate'),
              InlineKeyboardButton('sd去大gp', callback_data='send'),
+             InlineKeyboardButton('F5', callback_data='detail'),
              ],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -397,7 +414,7 @@ def _handle_event_detail(update, context, request_member):
         context.bot.send_message(chat_id=tg_id, text=text)
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={'event_id': db_events[0]['uuid'], 'date': fp['input'], 'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={"event_id": db_events[0]['uuid'], "input": "", "choose": ""})
 
 
 def _handle_event_attend(update, context, request_member):
@@ -432,7 +449,7 @@ def _handle_event_attend(update, context, request_member):
                                   attendance=attendance, reason=reason)
     db_events = event_service.find_by_id(tg_group_id=TG_GROUP_ID, event_id=event_id, status=["ACTIVE"])
     if db_events:
-        text = formatter.format_event(db_events[0], expand=False)
+        text = formatter.format_event(db_events[0], expand=2)
         context.bot.send_message(chat_id=TG_GROUP_ID, text=text)
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
@@ -626,10 +643,10 @@ def _handle_event_guest(update, context, request_member):
 
         db_events = event_service.take_attendance(tg_group_id=TG_GROUP_ID, event_id=event_id, member_id=db_guest['uuid'], attendance="GO", reason='')
         if db_events:
-            context.bot.send_message(chat_id=tg_id, text=f"轉左去 {fp['input']}")
+            context.bot.send_message(chat_id=tg_id, text=f"加左 {name}")
         else:
             context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
-            raise EventError("cannot update event venue")
+            raise EventError("cannot update event guest")
 
     # update footprint
     set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
@@ -662,13 +679,50 @@ def _handle_event_attendance(update, context, request_member, attendance):
             context.bot.send_message(chat_id=tg_id, text=f"加唔到 {name}")
             continue
 
-        db_events = event_service.take_attendance(tg_group_id=TG_GROUP_ID, event_id=event_id,
-                                                  member_id=db_members[0]['uuid'], attendance=attendance, reason='')
+        db_events = event_service.take_attendance(tg_group_id=TG_GROUP_ID, event_id=event_id, member_id=db_members[0]['uuid'], attendance=attendance, reason='')
         if db_events:
             context.bot.send_message(chat_id=tg_id, text=f"加左 {name}")
         else:
             context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
             raise EventError("cannot update event member attendance")
+
+    # update footprint
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+
+
+def _handle_event_ball(update, context, request_member, action):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    fp = get_footprint(tg_id)
+
+    # validate
+    if not member_service.is_admin(request_member['type']):
+        raise Unauthorized(f"{request_member['name']} is trying to update some events")
+    if 'event_id' not in fp or not fp['event_id']:
+        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+        return
+    if 'input' not in fp or not fp['input']:
+        context.bot.send_message(chat_id=tg_id, text="邊個? (可以打多幾個名, Eg: lydia, tszwai)")
+        return
+
+    event_id = fp['event_id']
+    names = fp['input'].split(",")
+    if len(names) == 1:
+        names = fp['input'].split("，")
+
+    for name in names:
+        name = name.strip()
+        db_members = member_service.find_by_name(tg_group_id=TG_GROUP_ID, name=name, status=["ACTIVE"])
+        if not db_members:
+            context.bot.send_message(chat_id=tg_id, text=f"加唔到 {name}")
+            continue
+
+        db_events = event_service.take_ball(tg_group_id=TG_GROUP_ID, event_id=event_id, member_id=db_members[0]['uuid'], action=action)
+        if db_events:
+            context.bot.send_message(chat_id=tg_id, text=f"加左 {name}")
+        else:
+            context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+            raise EventError("cannot update event ball")
 
     # update footprint
     set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
@@ -691,10 +745,32 @@ def _handle_event_send(update, context, request_member):
 
     db_events = event_service.find_by_id(tg_group_id=TG_GROUP_ID, event_id=event_id, status=["ACTIVE"])
     if db_events:
-        context.bot.send_message(chat_id=TG_GROUP_ID, text=formatter.format_event(db_events[0], expand=True))
+        context.bot.send_message(chat_id=TG_GROUP_ID, text=formatter.format_event(db_events[0], expand=3))
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError("cannot send event")
+
+    # update footprint
+    # set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+
+
+def _handle_event_create(update, context, request_member):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    fp = get_footprint(tg_id)
+
+    # validate
+    if not member_service.is_admin(request_member['type']):
+        raise Unauthorized(f"{request_member['name']} is trying to create some events")
+
+    db_events = event_service.create(tg_group_id=TG_GROUP_ID)
+    if db_events:
+        set_footprint(tg_id=tg_id, command='event', data_map={'event_id': db_events[0]['uuid']})
+        _handle_event_detail(update, context, request_member)
+        # context.bot.send_message(chat_id=tg_id, text=formatter.format_event(db_events[0], expand=3))
+    else:
+        context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+        raise EventError("cannot create event")
 
     # update footprint
     # set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
@@ -710,8 +786,8 @@ def handle_help(update, context):
 def handle_button(update, context):
     tg_id = update.effective_user.id
     query = update.callback_query
-    print(query)
-    print(update)
+    # print(query)
+    # print(update)
 
     # handle group event command
     try:
@@ -740,7 +816,11 @@ def handle_button(update, context):
             set_footprint(tg_id, command='me', subcommand=query.data)
             _handle_me(update, context)
         elif "event" == fp['command']:
-            set_footprint(tg_id, command='event', subcommand=query.data)
+            if 'choose' in fp and "event_id" == fp['choose']:
+                set_footprint(tg_id, command='event', data_map={fp['choose']: query.data})
+            else:
+                set_footprint(tg_id, command='event', subcommand=query.data)
+
             _handle_event(update, context)
     finally:
         # CallbackQueries need to be answered, even if no notification to the user is needed

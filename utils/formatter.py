@@ -13,6 +13,7 @@ import textwrap
 from itertools import groupby
 from operator import itemgetter
 
+from entities.exceptions import EventError
 from utils import ts
 from utils.ts import DATE_WITH_WEEK_FORMAT
 
@@ -97,7 +98,13 @@ def deformat_event_type(etype):
 # 未知:
 #
 # 雲遊太空中: MaN
-def format_event(event, expand: bool):
+def format_event(event, expand: int):
+    if expand not in range(1, 4):
+        raise EventError(f"invalid expand({expand})")
+
+    if expand == 1:
+        return f"{event['name']} {format_event_type(event['type'])} {event['venue']} {event['start']}-{event['end']}"
+
     who_bring_ball = set()
     who_get_ball = set()
     who_go = set()
@@ -137,7 +144,7 @@ def format_event(event, expand: bool):
         else:
             who_not_sure.add(name)
 
-    if expand:
+    if expand == 3:
         detail = f"""去: {', '.join(who_go)}
             去(教練): {', '.join(who_coach_go)}
             跟操: {', '.join(who_guest_go)}
@@ -145,7 +152,6 @@ def format_event(event, expand: bool):
             唔去: {', '.join(who_not_go)}
             未知: {', '.join(who_not_sure)}
         """
-
     else:
         detail = f"去: {len(who_go)} ({len(who_coach_go)}), 跟操: {len(who_guest_go)}, 唔去: {len(who_not_go)}, 未知: {len(who_not_sure)}"
 
@@ -239,9 +245,9 @@ def test():
         "status": "ACTIVE"
     }
     print("---")
-    print(format_event(test_str, True))
+    print(format_event(test_str, 3))
     print("---")
-    print(format_event(test_str, False))
+    print(format_event(test_str, 2))
     print("---")
 
 

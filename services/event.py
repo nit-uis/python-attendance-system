@@ -1,4 +1,6 @@
-from dao import eventdao
+import uuid
+
+from dao import eventdao, memberdao
 from entities.exceptions import EventError
 from utils import log, ts
 
@@ -36,13 +38,74 @@ def find_coming(tg_group_id):
     return eventdao.find_by_start(tg_group_id=tg_group_id, start=ts.get_utc_now_in_ms(), status=["ACTIVE"])
 
 
+
+
+
+
+
+
+
+
+def create(tg_group_id):
+    if not tg_group_id:
+        raise EventError(f"cannot create event, tg_group_id={tg_group_id}")
+
+    # {
+    #   "date": 1591200000000,
+    #   "name": "練波啦喂😂",
+    #   "updateAt": 1590908927455,
+    #   "type": "GATHERING",
+    #   "uuid": "ace4e2c9-eff0-494f-9ad3-7e5292eef4c6",
+    #   "createAt": 1548086343683,
+    #   "status": "ACTIVE"
+    # }
+    event = {
+      "date": ts.get_utc_now_in_ms() + ts.ONE_WEEK_SECONDS * 1000,
+      "name": "夠鐘執波了",
+      "type": "PRACTICE",
+      "uuid": str(uuid.uuid4()),
+      "createAt": ts.get_utc_now_in_ms(),
+      "updateAt": ts.get_utc_now_in_ms(),
+      "status": "ACTIVE"
+    }
+    venue = eventdao.find_most_common_venues(tg_group_id=tg_group_id, status=["ACTIVE"])
+    if venue:
+        venue = venue[0]['name']
+    else:
+        venue = "唔知去邊"
+    start_time = eventdao.find_most_common_start_time(tg_group_id=tg_group_id, status=["ACTIVE"])
+    if start_time:
+        start_time = start_time[0]['time']
+    else:
+        start_time = "00:00"
+    end_time = eventdao.find_most_common_end_time(tg_group_id=tg_group_id, status=["ACTIVE"])
+    if end_time:
+        end_time = end_time[0]['time']
+    else:
+        end_time = "23:59"
+    db_events = eventdao.create(tg_group_id=tg_group_id, event=event, start_time=start_time, end_time=end_time, venue=venue)
+    event_id = db_events[0]['uuid']
+    eventdao.take_attendance_by_default(tg_group_id=tg_group_id, event_id=event_id, attendance="GO", reason="", status=["ACTIVE"])
+    eventdao.take_attendance_by_default(tg_group_id=tg_group_id, event_id=event_id, attendance="NOT_GO", reason="", status=["ACTIVE"])
+    return eventdao.find_by_id(tg_group_id=tg_group_id, event_id=event_id, status=["ACTIVE"])
+
+
 def take_attendance(tg_group_id, event_id, member_id, attendance, reason):
     if not tg_group_id or not event_id or not member_id or not attendance:
         return None
     if attendance not in ["GO", "NOT_GO", "NOT_SURE"]:
         raise EventError(f"invalid attendance({attendance})")
 
-    eventdao.take_attendance(tg_group_id=tg_group_id, event_id=event_id, member_id=member_id, attendance=attendance, reason=str(reason).strip(), status=["ACTIVE"])
+    return eventdao.take_attendance(tg_group_id=tg_group_id, event_id=event_id, member_id=member_id, attendance=attendance, reason=str(reason).strip(), status=["ACTIVE"])
+
+
+def take_ball(tg_group_id, event_id, member_id, action):
+    if not tg_group_id or not event_id or not member_id or not action:
+        return None
+    if action not in ["BRING", "GET"]:
+        raise EventError(f"invalid action({action})")
+
+    return eventdao.take_ball(tg_group_id=tg_group_id, event_id=event_id, member_id=member_id, action=action, status=["ACTIVE"])
 
 
 def update_status(tg_group_id, event_id, status):
