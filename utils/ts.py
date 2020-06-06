@@ -49,8 +49,7 @@ def fromUtcnowToString(format):
 
 
 def is_milliseconds(ts):
-    ts = str(ts).strip()
-    return len(ts) > 11
+    return len(str(ts).strip()) > 11
 
 
 def to_string(ts, format=END_DATE_FORMAT):

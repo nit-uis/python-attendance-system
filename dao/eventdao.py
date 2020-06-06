@@ -72,6 +72,32 @@ def find_by_start_and_end(tg_group_id: str, start: int, end: int, status: list):
     return [i['event'] for i in results]
 
 
+def find_event_types(tg_group_id: str, status: list):
+    results = CLIENT.run("""
+        MATCH (event:TgEvent)--(memberGroup:TgMemberGroup{tgGroupId: {tg_group_id}}) 
+        WHERE event.status in {status} and memberGroup.status in {status}
+        RETURN DISTINCT event.type as etype    
+        ORDER BY event.type ASC
+    """, {"tg_group_id": tg_group_id, "status": status})
+
+    return [i['etype'] for i in results]
+
+
+def find_by_event_type(tg_group_id: str, etype: str, status: list):
+    results = CLIENT.run("""
+        MATCH (event:TgEvent{type: {etype}})--(memberGroup:TgMemberGroup{tgGroupId: {tg_group_id}}) 
+        WHERE event.status in {status} and memberGroup.status in {status}
+        OPTIONAL MATCH (event)-[:HOLD_AT]-(venue:TgVenue)
+        OPTIONAL MATCH (end:TgTime)-[:END_AT]-(event)-[:START_AT]-(start:TgTime)
+        OPTIONAL MATCH (member:TgMember)-[r:JOIN]-(event)
+        WHERE member.status in {status}
+        RETURN event{.*, start: start.time, end: end.time, venue: venue.name, members: collect(DISTINCT member{.*, attendance:r{.*}})}     
+        ORDER BY event.date ASC
+    """, {"tg_group_id": tg_group_id, "etype": etype, "status": status})
+
+    return [i['event'] for i in results]
+
+
 def find_most_common_venues(tg_group_id, status: list):
     results = CLIENT.run("""
         MATCH (event:TgEvent)--(memberGroup:TgMemberGroup{tgGroupId: {tg_group_id}}) 

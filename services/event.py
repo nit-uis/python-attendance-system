@@ -38,6 +38,19 @@ def find_coming(tg_group_id):
     return eventdao.find_by_start(tg_group_id=tg_group_id, start=ts.get_utc_now_in_ms(), status=["ACTIVE"])
 
 
+def find_event_types(tg_group_id, status):
+    if not tg_group_id:
+        return None
+
+    return eventdao.find_event_types(tg_group_id=tg_group_id, status=status)
+
+
+def find_by_event_type(tg_group_id, etype, status):
+    if not tg_group_id or not etype:
+        return None
+
+    return eventdao.find_by_event_type(tg_group_id=tg_group_id, etype=etype, status=status)
+
 
 
 

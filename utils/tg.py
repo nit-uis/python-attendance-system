@@ -316,6 +316,8 @@ def _handle_event(update, context):
 
     if "detail" == fp['subcommand']:
         _handle_event_detail(update, context, db_members[0])
+    elif "list" == fp['subcommand']:
+        _handle_event_list(update, context, db_members[0])
     elif "attend" == fp['subcommand']:
         _handle_event_attend(update, context, db_members[0])
     elif "delete" == fp['subcommand']:
@@ -418,6 +420,43 @@ def _handle_event_detail(update, context, request_member):
 
     # update footprint
     set_footprint(tg_id=tg_id, command='event', data_map={"event_id": db_events[0]['uuid'], "input": "", "choose": ""})
+
+
+def _handle_event_list(update, context, request_member):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    fp = get_footprint(tg_id)
+
+    # get event type list
+    db_event_types = event_service.find_event_types(tg_group_id=TG_GROUP_ID, status=["ACTIVE"])
+    if not db_event_types:
+        context.bot.send_message(chat_id=tg_id, text="搵唔到相關活動")
+        return
+
+    db_event_types = "/".join([formatter.format_event_type(i) for i in db_event_types])
+
+    # validate
+    if 'input' not in fp or not fp['input']:
+        context.bot.send_message(chat_id=tg_id, text=f"邊類? (Eg. {db_event_types})")
+        return
+    if not (etype := formatter.deformat_event_type(fp['input'])):
+        context.bot.send_message(chat_id=tg_id, text=f"冇呢類,試下 {db_event_types})")
+        return
+
+    db_events = event_service.find_by_event_type(tg_group_id=TG_GROUP_ID, etype=etype, status=["ACTIVE"])
+    print(db_events)
+    dates = '\n'.join([ts.to_string_hkt(i['date'], format=LOCAL_DATE_FORMAT) for i in db_events if i['date']])
+    if not dates:
+        context.bot.send_message(chat_id=tg_id, text="搵唔到相關活動")
+        return
+    keyboard = [
+        [InlineKeyboardButton("睇某event資料", callback_data='detail')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.send_message(chat_id=tg_id, text=dates, reply_markup=reply_markup)
+
+    # update footprint
+    set_footprint(tg_id=tg_id, command='event', data_map={"input": ""})
 
 
 def _handle_event_attend(update, context, request_member):
