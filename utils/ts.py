@@ -72,6 +72,7 @@ def compareTimestampWithUtcnow(ts):
 def getUtcnowTs():
     return datetime.utcnow()
 
+
 # def getUtcnowMillis():
 #     return int('%.0f'%(datetime.utcnow().timestamp() * 1000))
 
@@ -87,12 +88,12 @@ def get_utc_now_in_ms():
 
 
 # this is hk time on cloud server while it is utc time on localhost server DLLM
-def getHknowSeconds():
+def get_hk_now_seconds():
     return getUtcnowSeconds() + 60*60*8
 
 
 
 if __name__ == "__main__":
-    print(f'current getUtcnowTs={getUtcnowTs()}, getUtcnowSeconds={getUtcnowSeconds()}, getHknowSeconds={getHknowSeconds()}')
+    print(f'current getUtcnowTs={getUtcnowTs()}, getUtcnowSeconds={getUtcnowSeconds()}, get_hk_now_seconds={get_hk_now_seconds()}')
     print(to_seconds("2019/09/09 19:50 +0800", "%Y/%m/%d %H:%M %z"))
 

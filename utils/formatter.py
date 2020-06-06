@@ -165,7 +165,7 @@ def format_event(event, expand: int):
         """).strip()
 
 
-def format_stats(stats: dict):
+def format_member_stats(stats: dict):
     attend_count = stats['attend_count']
     event_count = stats['event_count']
     bring_count = stats['bring_count']
@@ -183,6 +183,15 @@ def format_stats(stats: dict):
 
                 *由加入起計
             """).strip()
+
+
+def format_member_group_stats(stats: dict):
+    astats = "出席排名(高>低): \n" + stats['attend_stats'].strip()
+    bstats = "拎波排名(高>低): \n" + stats['bring_stats'].strip()
+    gstats = "帶波排名(高>低): \n" + stats['get_stats'].strip()
+
+    return astats + "\n\n" + bstats + "\n\n" + gstats
+
 
 def test():
     test_str = {

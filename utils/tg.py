@@ -72,6 +72,16 @@ def daily_msg():
         updater.bot.send_message(chat_id=TG_GROUP_ID, text=text, reply_markup=reply_markup)
 
 
+def monthly_stats(tg_id):
+    # if today is the first day of month
+    now = ts.to_string(ts.get_hk_now_seconds())[6:8]
+    if now == "01" or True:
+        db_stats = event_service.find_stats(tg_group_id=TG_GROUP_ID, mtypes=["COACH", "GUEST"], status=["ACTIVE"])
+        text = formatter.format_member_group_stats(db_stats)
+        updater = Updater(token=TOKEN, use_context=True)
+        updater.bot.send_message(chat_id=tg_id, text=text)
+
+
 def handle_start(update, context):
     msg = ""
     LOGGER.info(update)
@@ -296,7 +306,7 @@ def _handle_member_stats(update, context, request_member):
 
     db_stats = event_service.find_stats_by_member(tg_group_id=TG_GROUP_ID, member_id=member_id, status=["ACTIVE"])
 
-    text = formatter.format_stats(db_stats[0])
+    text = formatter.format_member_stats(db_stats[0])
     context.bot.send_message(chat_id=tg_id, text=text)
 
     # update footprint

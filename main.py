@@ -37,7 +37,7 @@ if __name__ == '__main__':
     LOGGER.info(f"target neo4j host: {config.get_string('neo4j', 'host')}")
 
     schedule.every(2).seconds.do(tg.get_updates)
-    schedule.every().day.at("04:00").do(report.get_monthly_report)
+    schedule.every().day.at("04:00").do(tg.monthly_stats)
     schedule.every().day.at("04:01").do(tg.daily_msg)
 
     config.reset()

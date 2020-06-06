@@ -45,6 +45,27 @@ def find_stats_by_member(tg_group_id, member_id, status):
     return eventdao.find_stats_by_member(tg_group_id=tg_group_id, member_id=member_id, status=status)
 
 
+def find_stats(tg_group_id, mtypes, status):
+    if not tg_group_id or not mtypes:
+        return None
+
+    db_stats = eventdao.find_stats(tg_group_id=tg_group_id, mtypes=mtypes, status=status)
+    attend_stats = sorted(db_stats, key=lambda item: item['attend_count'] / item['event_count'], reverse=True)
+    attend_stats = '\n'.join([f"{i['member']['name']} ({i['attend_count']}/{i['event_count']})" for i in attend_stats])
+
+    bring_stats = sorted(db_stats, key=lambda item: item['bring_count'] / item['event_count'], reverse=True)
+    bring_stats = '\n'.join([f"{i['member']['name']} ({i['bring_count']}/{i['event_count']})" for i in bring_stats])
+
+    get_stats = sorted(db_stats, key=lambda item: item['get_count'] / item['event_count'], reverse=True)
+    get_stats = '\n'.join([f"{i['member']['name']} ({i['get_count']}/{i['event_count']})" for i in get_stats])
+
+    return {
+        'attend_stats': attend_stats,
+        'bring_stats': bring_stats,
+        'get_stats': get_stats,
+    }
+
+
 def find_coming(tg_group_id):
     if not tg_group_id:
         return None
