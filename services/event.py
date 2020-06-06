@@ -31,6 +31,20 @@ def find_by_date(tg_group_id, date: str, status):
     return eventdao.find_by_start_and_end(tg_group_id=tg_group_id, start=start, end=end, status=status)
 
 
+def find_by_event_type(tg_group_id, etype, status):
+    if not tg_group_id or not etype:
+        return None
+
+    return eventdao.find_by_event_type(tg_group_id=tg_group_id, etype=etype, status=status)
+
+
+def find_stats_by_member(tg_group_id, member_id, status):
+    if not tg_group_id or not member_id:
+        return None
+
+    return eventdao.find_stats_by_member(tg_group_id=tg_group_id, member_id=member_id, status=status)
+
+
 def find_coming(tg_group_id):
     if not tg_group_id:
         return None
@@ -44,12 +58,6 @@ def find_event_types(tg_group_id, status):
 
     return eventdao.find_event_types(tg_group_id=tg_group_id, status=status)
 
-
-def find_by_event_type(tg_group_id, etype, status):
-    if not tg_group_id or not etype:
-        return None
-
-    return eventdao.find_by_event_type(tg_group_id=tg_group_id, etype=etype, status=status)
 
 
 

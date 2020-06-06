@@ -178,6 +178,8 @@ def _handle_member(update, context):
         _handle_member_delete(update, context, db_members[0])
     elif "approve" == fp['subcommand']:
         _handle_member_approve(update, context, db_members[0])
+    elif "stats" == fp['subcommand']:
+        _handle_member_stats(update, context, db_members[0])
 
 
 def _handle_member_detail(update, context, request_member):
@@ -201,13 +203,18 @@ def _handle_member_detail(update, context, request_member):
         # todo handle command
         keyboard = [
             [InlineKeyboardButton('delete', callback_data='delete'),
-             InlineKeyboardButton('auto <黎>', callback_data='go'),
-             InlineKeyboardButton('auto <唔黎>', callback_data='not_go')],
+             InlineKeyboardButton('stats', callback_data='stats')],
+            [InlineKeyboardButton('auto <唔黎>', callback_data='not_go'),
+             InlineKeyboardButton('auto <黎>', callback_data='go')],
         ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        context.bot.send_message(chat_id=tg_id, text=text, reply_markup=reply_markup)
     else:
-        context.bot.send_message(chat_id=tg_id, text=text)
+        keyboard = [
+            [InlineKeyboardButton('stats', callback_data='stats')],
+            [InlineKeyboardButton('auto <唔黎>', callback_data='not_go'),
+             InlineKeyboardButton('auto <黎>', callback_data='go')],
+        ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    context.bot.send_message(chat_id=tg_id, text=text, reply_markup=reply_markup)
 
     # update footprint
     set_footprint(tg_id=tg_id, command='member', data_map={'member_id': db_members[0]['uuid'], 'input': ''})
@@ -275,6 +282,25 @@ def _handle_member_approve(update, context, request_member):
 
     # update footprint
     set_footprint(tg_id=tg_id, command='member', data_map={'input': ''})
+
+
+def _handle_member_stats(update, context, request_member):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    fp = get_footprint(tg_id)
+
+    # validate
+    if 'member_id' not in fp or not (member_id := fp['member_id']):
+        context.bot.send_message(chat_id=tg_id, text="我頭痛快啲帶我睇醫生")
+        return
+
+    db_stats = event_service.find_stats_by_member(tg_group_id=TG_GROUP_ID, member_id=member_id, status=["ACTIVE"])
+
+    text = formatter.format_stats(db_stats[0])
+    context.bot.send_message(chat_id=tg_id, text=text)
+
+    # update footprint
+    # set_footprint(tg_id=tg_id, command='member')
 
 
 def handle_me(update, context):

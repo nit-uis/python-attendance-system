@@ -165,6 +165,25 @@ def format_event(event, expand: int):
         """).strip()
 
 
+def format_stats(stats: dict):
+    attend_count = stats['attend_count']
+    event_count = stats['event_count']
+    bring_count = stats['bring_count']
+    get_count = stats['get_count']
+    attend_rate = 0
+    if event_count:
+        attend_rate = int(attend_count * 10000 / event_count) / 100
+
+    return textwrap.dedent(f"""
+                出席率(%): {attend_rate} 
+                出席次數: {attend_count} 
+                拎波次數: {get_count} 
+                帶波次數: {bring_count} 
+                活動數量: {event_count} 
+
+                *由加入起計
+            """).strip()
+
 def test():
     test_str = {
         "date": "1539129600000",
