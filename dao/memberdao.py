@@ -78,6 +78,32 @@ def find_by_tg_id_and_type(tg_id: str, mtype: str, status: list):
     return [i['member'] for i in results]
 
 
+def find_stats_by_member(tg_group_id: str, member_id: str, status: list):
+    results = CLIENT.run("""
+        MATCH (member:TgMember{uuid: {member_id}})-[:JOIN]-(event:TgEvent)--(memberGroup:TgMemberGroup{tgGroupId: {tg_group_id}}) 
+        WHERE member.status in {status} and event.status in {status} and memberGroup.status in {status}
+        OPTIONAL MATCH (member)-[gr{name:"GO"}]-(event)
+        OPTIONAL MATCH (member)-[bbr{bring:true}]-(event)
+        OPTIONAL MATCH (member)-[gbr{get:true}]-(event)
+        RETURN DISTINCT count(DISTINCT event) as event_count, count(DISTINCT gr) as attend_count, count(DISTINCT bbr) as bring_count, count(DISTINCT gbr) as get_count
+    """, {"tg_group_id": tg_group_id, "member_id": member_id, "status": status})
+
+    return [i.data() for i in results]
+
+
+def find_stats(tg_group_id: str, exclude_mtypes: list, status: list):
+    results = CLIENT.run("""
+        MATCH (member:TgMember)-[:JOIN]-(event:TgEvent)--(memberGroup:TgMemberGroup{tgGroupId: {tg_group_id}}) 
+        WHERE member.status in {status} and not member.type in {mtypes} and event.status in {status} and memberGroup.status in {status}
+        OPTIONAL MATCH (member)-[gr{name:"GO"}]-(event)
+        OPTIONAL MATCH (member)-[bbr{bring:true}]-(event)
+        OPTIONAL MATCH (member)-[gbr{get:true}]-(event)
+        RETURN DISTINCT member, count(DISTINCT event) as event_count, count(DISTINCT gr) as attend_count, count(DISTINCT bbr) as bring_count, count(DISTINCT gbr) as get_count
+    """, {"tg_group_id": tg_group_id, "exclude_mtypes": exclude_mtypes, "status": status})
+
+    return [i.data() for i in results]
+
+
 """
     UPDATE QUERY
 """

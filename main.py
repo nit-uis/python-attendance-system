@@ -1,7 +1,7 @@
 import schedule
 import time
 from configs import config
-from services import event, member, membergroup, security
+from services import event, member, membergroup, security, cache
 from utils import log, tg, formatter
 from db import neo4j
 from dao import membergroupdao, settingdao, memberdao, eventdao
@@ -22,6 +22,7 @@ def init():
     eventdao.init()
 
     tg.init(env)
+    cache.init()
     event.init()
     security.init()
     member.init()

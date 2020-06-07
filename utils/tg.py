@@ -77,7 +77,7 @@ def monthly_stats(tg_id):
     # if today is the first day of month
     now = ts.to_string(ts.get_hk_now_seconds())[6:8]
     if now == "01" or True:
-        db_stats = event_service.find_stats(tg_group_id=TG_GROUP_ID, mtypes=["COACH", "GUEST"], status=["ACTIVE"])
+        db_stats = member_service.find_stats(tg_group_id=TG_GROUP_ID, mtypes=["COACH", "GUEST"], status=["ACTIVE"])
         text = formatter.format_member_group_stats(db_stats)
         updater = Updater(token=TOKEN, use_context=True)
         updater.bot.send_message(chat_id=tg_id, text=text)
@@ -263,14 +263,14 @@ def get_event(tg_id, context):
     if 'input' in fp and (date := fp['input']):
         date = f"{date} +0800"
         db_events = event_service.find_by_date(tg_group_id=TG_GROUP_ID, date=date, status=["ACTIVE"])
-        if len(db_events) > 1:
+        if db_events and len(db_events) > 1:
             keyboard = [[InlineKeyboardButton(formatter.format_event(i, 1), callback_data=i['uuid'])] for i in
                         db_events]
             reply_markup = InlineKeyboardMarkup(keyboard)
             context.bot.send_message(chat_id=tg_id, text="邊個?", reply_markup=reply_markup)
             set_footprint(tg_id=tg_id, command='event', data_map={"choose": "event_id", "input": ""})
             return None
-        elif len(db_events) == 1:
+        elif db_events and len(db_events) == 1:
             return db_events[0]
 
     context.bot.send_message(chat_id=tg_id, text="邊日? (Eg. 2020-05-31)")
@@ -447,7 +447,7 @@ def _handle_member_stats(update, context, authorized_member):
     if not (db_member := get_member(tg_id, context)):
         return
 
-    db_stats = event_service.find_stats_by_member(tg_group_id=TG_GROUP_ID, member_id=db_member['uuid'], status=["ACTIVE"])
+    db_stats = member_service.find_stats_by_member(tg_group_id=TG_GROUP_ID, member_id=db_member['uuid'], status=["ACTIVE"])
 
     text = formatter.format_member_stats(db_stats[0])
     context.bot.send_message(chat_id=tg_id, text=text)

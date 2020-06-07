@@ -1,6 +1,7 @@
 import uuid
 
-from dao import eventdao, memberdao
+from dao import eventdao
+from services import cache as simple_cache
 from entities.exceptions import EventError
 from utils import log, ts
 
@@ -16,7 +17,13 @@ def find_by_id(tg_group_id, event_id, status):
     if not tg_group_id or not event_id:
         return None
 
-    return eventdao.find_by_id(tg_group_id=tg_group_id, event_id=event_id, status=status)
+    key = f"event:{tg_group_id}:{event_id}"
+    if cache := simple_cache.get(key):
+        return cache
+
+    db_events = eventdao.find_by_id(tg_group_id=tg_group_id, event_id=event_id, status=status)
+    simple_cache.update(key, db_events)
+    return db_events
 
 
 # date in format yyyy-MM-dd +0800
@@ -26,66 +33,53 @@ def find_by_date(tg_group_id, date: str, status):
 
     start = ts.to_milliseconds(date)
     end = (start + (ts.ONE_DAY_SECONDS + 1) * 1000)
-    print(start, end)
 
-    return eventdao.find_by_start_and_end(tg_group_id=tg_group_id, start=start, end=end, status=status)
+    db_events = eventdao.find_by_start_and_end(tg_group_id=tg_group_id, start=start, end=end, status=status)
+    return db_events
 
 
 def find_by_event_type(tg_group_id, etype, status):
     if not tg_group_id or not etype:
         return None
 
-    return eventdao.find_by_event_type(tg_group_id=tg_group_id, etype=etype, status=status)
+    key = f"event:{tg_group_id}:{etype}"
+    if cache := simple_cache.get(key):
+        return cache
 
-
-def find_stats_by_member(tg_group_id, member_id, status):
-    if not tg_group_id or not member_id:
-        return None
-
-    return eventdao.find_stats_by_member(tg_group_id=tg_group_id, member_id=member_id, status=status)
-
-
-def find_stats(tg_group_id, mtypes, status):
-    if not tg_group_id or not mtypes:
-        return None
-
-    db_stats = eventdao.find_stats(tg_group_id=tg_group_id, mtypes=mtypes, status=status)
-    attend_stats = sorted(db_stats, key=lambda item: item['attend_count'] / item['event_count'], reverse=True)
-    attend_stats = '\n'.join([f"{i['member']['name']} ({i['attend_count']}/{i['event_count']})" for i in attend_stats])
-
-    bring_stats = sorted(db_stats, key=lambda item: item['bring_count'] / item['event_count'], reverse=True)
-    bring_stats = '\n'.join([f"{i['member']['name']} ({i['bring_count']}/{i['event_count']})" for i in bring_stats])
-
-    get_stats = sorted(db_stats, key=lambda item: item['get_count'] / item['event_count'], reverse=True)
-    get_stats = '\n'.join([f"{i['member']['name']} ({i['get_count']}/{i['event_count']})" for i in get_stats])
-
-    return {
-        'attend_stats': attend_stats,
-        'bring_stats': bring_stats,
-        'get_stats': get_stats,
-    }
+    db_events = eventdao.find_by_event_type(tg_group_id=tg_group_id, etype=etype, status=status)
+    simple_cache.update(key, db_events)
+    return db_events
 
 
 def find_coming(tg_group_id):
     if not tg_group_id:
         return None
 
-    return eventdao.find_by_start(tg_group_id=tg_group_id, start=ts.get_utc_now_in_ms(), status=["ACTIVE"])
+    key = f"events:{tg_group_id}"
+    if cache := simple_cache.get(key):
+        return cache
+
+    db_events = eventdao.find_by_start(tg_group_id=tg_group_id, start=ts.get_utc_now_in_ms(), status=["ACTIVE"])
+    simple_cache.update(key, db_events)
+    return db_events
 
 
 def find_event_types(tg_group_id, status):
     if not tg_group_id:
         return None
 
-    return eventdao.find_event_types(tg_group_id=tg_group_id, status=status)
+    key = f"event:{tg_group_id}:types"
+    if cache := simple_cache.get(key):
+        return cache
+
+    db_etypes = eventdao.find_event_types(tg_group_id=tg_group_id, status=status)
+    simple_cache.update(key, db_etypes)
+    return db_etypes
 
 
-
-
-
-
-
-
+"""
+    UPDATE 
+"""
 
 
 def create(tg_group_id, event_id=''):
@@ -147,7 +141,10 @@ def create(tg_group_id, event_id=''):
     eventdao.reset_attendance(tg_group_id=tg_group_id, event_id=event_id, attendance="NOT_SURE", reason="", status=["ACTIVE"])
     eventdao.take_attendance_by_default(tg_group_id=tg_group_id, event_id=event_id, attendance="GO", reason="", status=["ACTIVE"])
     eventdao.take_attendance_by_default(tg_group_id=tg_group_id, event_id=event_id, attendance="NOT_GO", reason="", status=["ACTIVE"])
-    return eventdao.find_by_id(tg_group_id=tg_group_id, event_id=event_id, status=["ACTIVE"])
+
+    db_events = eventdao.find_by_id(tg_group_id=tg_group_id, event_id=event_id, status=["ACTIVE"])
+    simple_cache.delete("events", bulk=True)
+    return db_events
 
 
 def take_attendance(tg_group_id, event_id, member_id, attendance, reason):
@@ -156,7 +153,9 @@ def take_attendance(tg_group_id, event_id, member_id, attendance, reason):
     if attendance not in ["GO", "NOT_GO", "NOT_SURE"]:
         raise EventError(f"invalid attendance({attendance})")
 
-    return eventdao.take_attendance(tg_group_id=tg_group_id, event_id=event_id, member_id=member_id, attendance=attendance, reason=str(reason).strip(), status=["ACTIVE"])
+    db_events = eventdao.take_attendance(tg_group_id=tg_group_id, event_id=event_id, member_id=member_id, attendance=attendance, reason=str(reason).strip(), status=["ACTIVE"])
+    simple_cache.delete(f"event:{tg_group_id}:{event_id}")
+    return db_events
 
 
 def take_ball(tg_group_id, event_id, member_id, action):
@@ -165,35 +164,47 @@ def take_ball(tg_group_id, event_id, member_id, action):
     if action not in ["BRING", "GET"]:
         raise EventError(f"invalid action({action})")
 
-    return eventdao.take_ball(tg_group_id=tg_group_id, event_id=event_id, member_id=member_id, action=action, status=["ACTIVE"])
+    db_events = eventdao.take_ball(tg_group_id=tg_group_id, event_id=event_id, member_id=member_id, action=action, status=["ACTIVE"])
+    simple_cache.delete(f"event:{tg_group_id}:{event_id}")
+    return db_events
 
 
 def update_status(tg_group_id, event_id, status):
     if not event_id or not tg_group_id:
         raise EventError(f"cannot update event status, event_id={event_id}, tg_group_id={tg_group_id}")
 
-    return eventdao.update_status(tg_group_id=tg_group_id, event_id=event_id, status=status)
+    db_events = eventdao.update_status(tg_group_id=tg_group_id, event_id=event_id, status=status)
+    simple_cache.delete("events", bulk=True)
+    simple_cache.delete(f"event:{tg_group_id}:{event_id}")
+    return db_events
 
 
 def update_start_time(tg_group_id, event_id, start_time):
     if not event_id or not tg_group_id or not start_time:
         raise EventError(f"cannot update event start time, event_id={event_id}, tg_group_id={tg_group_id}")
 
-    return eventdao.update_start_time(tg_group_id=tg_group_id, event_id=event_id, time=start_time)
+    db_events = eventdao.update_start_time(tg_group_id=tg_group_id, event_id=event_id, time=start_time)
+    simple_cache.delete(f"event:{tg_group_id}:{event_id}")
+    return db_events
 
 
 def update_end_time(tg_group_id, event_id, end_time):
     if not event_id or not tg_group_id or not end_time:
         raise EventError(f"cannot update event end time, event_id={event_id}, tg_group_id={tg_group_id}")
 
-    return eventdao.update_end_time(tg_group_id=tg_group_id, event_id=event_id, time=end_time)
+    db_events = eventdao.update_end_time(tg_group_id=tg_group_id, event_id=event_id, time=end_time)
+    simple_cache.delete(f"event:{tg_group_id}:{event_id}")
+    return db_events
 
 
 def update_type(tg_group_id, event_id, etype):
     if not event_id or not tg_group_id or not etype:
         raise EventError(f"cannot update event type, event_id={event_id}, tg_group_id={tg_group_id}")
 
-    return eventdao.update_type(tg_group_id=tg_group_id, event_id=event_id, etype=etype)
+    db_events = eventdao.update_type(tg_group_id=tg_group_id, event_id=event_id, etype=etype)
+    simple_cache.delete(f"event:{tg_group_id}:{event_id}")
+    simple_cache.delete(f"event:{tg_group_id}:{etype}")
+    return db_events
 
 
 def update_date(tg_group_id, event_id, date: str):
@@ -202,18 +213,25 @@ def update_date(tg_group_id, event_id, date: str):
 
     date = ts.to_milliseconds(date)
 
-    return eventdao.update_date(tg_group_id=tg_group_id, event_id=event_id, date=date)
+    db_events = eventdao.update_date(tg_group_id=tg_group_id, event_id=event_id, date=date)
+    simple_cache.delete("events", bulk=True)
+    simple_cache.delete(f"event:{tg_group_id}:{event_id}")
+    return db_events
 
 
 def update_name(tg_group_id, event_id, name: str):
     if not event_id or not tg_group_id or not name:
         raise EventError(f"cannot update event name, event_id={event_id}, tg_group_id={tg_group_id}")
 
-    return eventdao.update_name(tg_group_id=tg_group_id, event_id=event_id, name=name)
+    db_events = eventdao.update_name(tg_group_id=tg_group_id, event_id=event_id, name=name)
+    simple_cache.delete(f"event:{tg_group_id}:{event_id}")
+    return db_events
 
 
 def update_venue(tg_group_id, event_id, venue: str):
     if not event_id or not tg_group_id or not venue:
         raise EventError(f"cannot update event venue, event_id={event_id}, tg_group_id={tg_group_id}")
 
-    return eventdao.update_venue(tg_group_id=tg_group_id, event_id=event_id, venue=venue)
+    db_events = eventdao.update_venue(tg_group_id=tg_group_id, event_id=event_id, venue=venue)
+    simple_cache.delete(f"event:{tg_group_id}:{event_id}")
+    return db_events
