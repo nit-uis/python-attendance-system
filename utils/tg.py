@@ -26,6 +26,7 @@ def init(env):
     SUPER_ADMIN_TG_IDS = db_setting['superAdminTgIds']
     TG_GROUP_ID = db_setting['tgGroupId']
     LOGGER = log.get_logger("tg")
+    LOGGER.info(f"{SUPER_ADMIN_TG_IDS=}")
 
 
 def get_updates():
@@ -34,12 +35,14 @@ def get_updates():
 
     start_handler = CommandHandler('start', handle_start)
     member_handler = CommandHandler('member', handle_member)
+    me_handler = CommandHandler('me', handle_me)
     event_handler = CommandHandler('event', handle_event)
     input_handler = MessageHandler(Filters.text & (~Filters.command), handle_input)
     button_handler = CallbackQueryHandler(handle_button)
 
     dispatcher.add_handler(start_handler)
     dispatcher.add_handler(member_handler)
+    dispatcher.add_handler(me_handler)
     dispatcher.add_handler(event_handler)
     dispatcher.add_handler(input_handler)
     dispatcher.add_handler(button_handler)
@@ -186,6 +189,33 @@ def _handle_member(update, context, authorized_member):
         _handle_member_approve(update, context, authorized_member)
     elif "stats" == fp['subcommand']:
         _handle_member_stats(update, context, authorized_member)
+    elif "name" == fp['subcommand']:
+        _handle_member_name(update, context, authorized_member)
+    elif "bday" == fp['subcommand']:
+        _handle_member_bday(update, context, authorized_member)
+    elif "go" == fp['subcommand']:
+        _handle_member_default_attendance(update, context, authorized_member, attendance="GO")
+    elif "not_go" == fp['subcommand']:
+        _handle_member_default_attendance(update, context, authorized_member, attendance="NOT_GO")
+
+
+def _handle_member_default_attendance(update, context, authorized_member, attendance):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # validate
+    if not (db_member := get_member(tg_id, context)):
+        return
+
+    db_members = member_service.update_default_attendance(tg_group_id=TG_GROUP_ID, member_id=db_member['uuid'], attendance=attendance)
+    if db_members:
+        context.bot.send_message(chat_id=tg_id, text=f"OK")
+    else:
+        context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+        raise EventError("cannot update member default attendance")
+
+    # update footprint
+    set_footprint(tg_id=tg_id, command='member', data_map={'input': '', "choose": ""})
 
 
 def get_member(tg_id, context):
@@ -331,26 +361,24 @@ def _handle_member_detail(update, context, authorized_member):
         keyboard = [
             [InlineKeyboardButton('delete', callback_data='delete'),
              InlineKeyboardButton('stats', callback_data='stats')],
+            # todo handle command
             [InlineKeyboardButton('auto <唔黎>', callback_data='not_go'),
+             # todo handle command
              InlineKeyboardButton('auto <黎>', callback_data='go')],
         ]
     else:
-        if db_member['uuid'] == authorized_member['uuid']:
-            keyboard = [
-                [InlineKeyboardButton('stats', callback_data='stats')],
-                # todo handle command
-                [InlineKeyboardButton('auto <唔黎>', callback_data='not_go'),
-                 # todo handle command
-                 InlineKeyboardButton('auto <黎>', callback_data='go')],
-                # todo handle command
-                [InlineKeyboardButton('改名', callback_data='name'),
-                 # todo handle command
-                 InlineKeyboardButton('改生日', callback_data='bday')],
-            ]
-        else:
-            keyboard = [
-                [InlineKeyboardButton('stats', callback_data='stats')],
-            ]
+        keyboard = [
+            [InlineKeyboardButton('stats', callback_data='stats')],
+        ]
+
+    if db_member['uuid'] == authorized_member['uuid']:
+        keyboard += [
+            # todo handle command
+            [InlineKeyboardButton('改名', callback_data='name'),
+             # todo handle command
+             InlineKeyboardButton('改生日', callback_data='bday')],
+        ]
+
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_message(chat_id=tg_id, text=text, reply_markup=reply_markup)
 
@@ -428,26 +456,55 @@ def _handle_member_stats(update, context, authorized_member):
     # set_footprint(tg_id=tg_id, command='member')
 
 
+def _handle_member_name(update, context, authorized_member):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # validate
+    if not (db_member := get_member(tg_id, context)):
+        return
+    if not (name := get_name_input(tg_id, context)):
+        return
+
+    db_members = member_service.update_name(tg_group_id=TG_GROUP_ID, member_id=db_member['uuid'], name=name)
+    if db_members:
+        context.bot.send_message(chat_id=tg_id, text=f"OK")
+    else:
+        context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+        raise EventError("cannot update member name")
+
+    # update footprint
+    set_footprint(tg_id=tg_id, command='member', data_map={'input': '', "choose": ""})
+
+
+def _handle_member_bday(update, context, authorized_member):
+    tg_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # validate
+    if not (db_member := get_member(tg_id, context)):
+        return
+    if not (date := get_date_input(tg_id, context)):
+        return
+
+    db_members = member_service.update_bday(tg_group_id=TG_GROUP_ID, member_id=db_member['uuid'], bday=date)
+    if db_members:
+        context.bot.send_message(chat_id=tg_id, text=f"OK")
+    else:
+        context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+        raise EventError("cannot update member bday")
+
+    # update footprint
+    set_footprint(tg_id=tg_id, command='member', data_map={'input': '', "choose": ""})
+
+
 def handle_me(update, context):
     tg_id = update.effective_user.id
     db_member = security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
 
+    set_footprint(tg_id=tg_id, command='member', subcommand='', clean_user_data=True)
     set_footprint(tg_id=tg_id, command='member', data_map={'member_id': db_member['uuid']})
     _handle_member_detail(update, context, db_member)
-
-    keyboard = [
-        [InlineKeyboardButton("睇某成員資料", callback_data='detail')],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    db_members = member_service.list(tg_group_id=TG_GROUP_ID, status=["ACTIVE"])
-    members = formatter.format_members(db_members)
-    if not members:
-        members = "冇晒人lu.."
-
-    set_footprint(tg_id=tg_id, command='member', subcommand='', clean_user_data=True)
-
-    update.message.reply_text(members, reply_markup=reply_markup)
 
 
 def handle_event(update, context):

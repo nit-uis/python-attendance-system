@@ -111,3 +111,33 @@ def update_status(tg_group_id: str, member_id: str, status: list):
         """, {"tg_group_id": tg_group_id, "member_id": member_id, "status": status})
 
     return [i['member'] for i in results]
+
+
+def update_bday(tg_group_id: str, member_id: str, bday: int):
+    results = CLIENT.run("""
+            MATCH (member:TgMember{uuid: {member_id}, status: "ACTIVE", tgGroupId: {tg_group_id}}) 
+            SET member.bornAt = {bday}, member.updateAt = timestamp()
+            RETURN member
+        """, {"tg_group_id": tg_group_id, "member_id": member_id, "bday": bday})
+
+    return [i['member'] for i in results]
+
+
+def update_name(tg_group_id: str, member_id: str, name: str):
+    results = CLIENT.run("""
+            MATCH (member:TgMember{uuid: {member_id}, status: "ACTIVE", tgGroupId: {tg_group_id}}) 
+            SET member.name = {name}, member.updateAt = timestamp()
+            RETURN member
+        """, {"tg_group_id": tg_group_id, "member_id": member_id, "name": name})
+
+    return [i['member'] for i in results]
+
+
+def update_default_attendance(tg_group_id: str, member_id: str, attendance: str):
+    results = CLIENT.run("""
+            MATCH (member:TgMember{uuid: {member_id}, status: "ACTIVE", tgGroupId: {tg_group_id}}) 
+            SET member.defaultAttendance = {attendance}, member.updateAt = timestamp()
+            RETURN member
+        """, {"tg_group_id": tg_group_id, "member_id": member_id, "attendance": attendance})
+
+    return [i['member'] for i in results]

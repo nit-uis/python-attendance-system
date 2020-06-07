@@ -18,38 +18,63 @@ from utils import ts
 from utils.ts import DATE_WITH_WEEK_FORMAT
 
 
-def format_member(member):
-    if "ADMIN" in member['type']:
-        mtype = "管理員"
-    elif "COACH" in member['type']:
-        mtype = "教練"
-    else:
-        mtype = "成員"
-
-    if "INACTIVE" in member['status']:
+def format_status(status):
+    if "INACTIVE" in status:
         status = "已經唔係度"
     else:
         status = "仲在係度"
+    return status
+
+
+def format_member_type(mtype, expand: int):
+    if "ADMIN" in mtype:
+        if expand == 0:
+            mtype = "*"
+        else:
+            mtype = "管理員"
+    elif "COACH" in mtype:
+        if expand == 0:
+            mtype = "#"
+        else:
+            mtype = "教練"
+    else:
+        if expand == 0:
+            mtype = ""
+        else:
+            mtype = "成員"
+    return mtype
+
+
+def format_attendance(attendance):
+    if "GO" == attendance:
+        attendance = "黎"
+    elif "NOT_GO" == attendance:
+        attendance = "唔黎"
+    else:
+        attendance = ""
+    return attendance
+
+
+def format_member(member):
+    mtype = format_member_type(member['type'], expand=1)
+    status = format_status(member['status'])
+    if 'bornAt' not in member or not (bornAt := ts.to_string_hkt(member['bornAt'])):
+        bornAt = "未set"
+    if 'defaultAttendance' not in member or not (attendance := format_attendance(member['defaultAttendance'])):
+        attendance = "未set"
 
     return textwrap.dedent(f"""
         {member['name']} ({mtype})
-        加入日期: {ts.to_string_hkt(member['createAt'])}
+        加入: {ts.to_string_hkt(member['createAt'])}
+        生日: {bornAt}
         狀態: {status}
+        自動: {attendance}
     """).strip()
 
 
 def format_members(members):
     members = sorted(members, key=lambda item: item['name'])
-    return '\n'.join([m['name'] + format_member_type(m['type']) for m in members]) + "\n\n*=admin, #=coach"
-
-
-def format_member_type(mtype):
-    if "ADMIN" in mtype:
-        return "*"
-    elif "COACH" == mtype:
-        return "#"
-    else:
-        return ""
+    return '\n'.join([m['name'] + format_member_type(m['type'], expand=0) for m in members]) + "\n\n*=admin, #=coach"
 
 
 def format_event_type(etype):

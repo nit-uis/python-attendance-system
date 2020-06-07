@@ -110,3 +110,27 @@ def update_status(tg_group_id, member_id, status):
         raise MemberError(f"cannot update member status, member_id={member_id}, tg_group_id={tg_group_id}")
 
     return memberdao.update_status(tg_group_id=tg_group_id, member_id=member_id, status=status)
+
+
+def update_name(tg_group_id, member_id, name: str):
+    if not member_id or not tg_group_id or not name:
+        raise MemberError(f"cannot update member name, member_id={member_id}, tg_group_id={tg_group_id}")
+
+    return memberdao.update_name(tg_group_id=tg_group_id, member_id=member_id, name=name)
+
+
+def update_bday(tg_group_id, member_id, bday: str):
+    if not member_id or not tg_group_id or len(bday) != 16:
+        raise MemberError(f"cannot update member bday, member_id={member_id}, tg_group_id={tg_group_id}")
+
+    bday = ts.to_milliseconds(bday)
+
+    return memberdao.update_bday(tg_group_id=tg_group_id, member_id=member_id, bday=bday)
+
+
+def update_default_attendance(tg_group_id, member_id, attendance: str):
+    if not member_id or not tg_group_id or attendance not in ["GO", "NOT_GO", "NOT_SURE"]:
+        raise MemberError(f"cannot update member default attendance, member_id={member_id}, tg_group_id={tg_group_id}")
+
+    return memberdao.update_default_attendance(tg_group_id=tg_group_id, member_id=member_id, attendance=attendance)
+
