@@ -1,10 +1,10 @@
 import schedule
 import time
 from configs import config
-from services import event, member, membergroup, report
+from services import event, member, membergroup, security
 from utils import log, tg, formatter
 from db import neo4j
-from dao import membergroupdao, settingdao, reportdao, memberdao, eventdao
+from dao import membergroupdao, settingdao, memberdao, eventdao
 import os
 
 LOGGER = None
@@ -17,14 +17,13 @@ def init():
 
     neo4j.init()
     settingdao.init()
-    reportdao.init()
     memberdao.init()
     membergroupdao.init()
     eventdao.init()
 
     tg.init(env)
     event.init()
-    report.init()
+    security.init()
     member.init()
     membergroup.init()
 

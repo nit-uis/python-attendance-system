@@ -224,6 +224,24 @@ def take_attendance_by_default(tg_group_id: str, event_id: str, attendance: str,
     return [i['event'] for i in results]
 
 
+def reset_attendance(tg_group_id: str, event_id: str, attendance: str, reason: str, status: list):
+    results = CLIENT.run("""
+        MATCH (event:TgEvent{uuid: {event_id}})--(memberGroup:TgMemberGroup{tgGroupId: {tg_group_id}}) 
+        WHERE event.status in {status} and memberGroup.status in {status} 
+        MATCH (member:TgMember)--(memberGroup)
+        WHERE member.status in {status} 
+        MERGE (member)-[r:JOIN]->(event)
+        SET r.name = {attendance}, r.reason = {reason}, r.createAt = timestamp(), r.bring = false, r.get = false
+        RETURN event  
+    """, {"tg_group_id": tg_group_id,
+          "event_id": event_id,
+          "attendance": attendance,
+          "reason": reason,
+          "status": status})
+
+    return [i['event'] for i in results]
+
+
 def take_ball(tg_group_id: str, event_id: str, member_id: str, action: str, status: list):
     bring = False
     get = False

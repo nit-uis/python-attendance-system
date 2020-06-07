@@ -1,6 +1,6 @@
 import uuid
 
-from entities.exceptions import MemberError
+from entities.exceptions import MemberError, Unauthorized
 from utils import log, ts
 from dao import memberdao
 
@@ -13,8 +13,11 @@ def init():
     LOGGER = log.get_logger("member")
 
 
-def is_admin(mtype):
-    return "ADMIN" in mtype
+def find_by_member_id(tg_group_id, member_id, status):
+    if not tg_group_id or not member_id:
+        return None
+
+    return memberdao.find_by_member_id(tg_group_id=tg_group_id, member_id=str(member_id), status=status)
 
 
 def find_by_tg_id(tg_group_id, tg_id, status):

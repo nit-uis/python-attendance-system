@@ -40,7 +40,7 @@ def format_member(member):
 
 def format_members(members):
     members = sorted(members, key=lambda item: item['name'])
-    return '\n'.join([m['name'] + format_member_type(m['type']) for m in members])
+    return '\n'.join([m['name'] + format_member_type(m['type']) for m in members]) + "\n\n*=admin, #=coach"
 
 
 def format_member_type(mtype):
@@ -125,22 +125,25 @@ def format_event(event, expand: int):
         elif 'get' in member['attendance'] and member['attendance']['get']:
             who_get_ball.add(name)
 
-        if member['attendance']['name'] == "GO":
-            text = name
-            if reason:
-                text = f"{name}({reason})"
+        if 'name' in member['attendance']:
+            if member['attendance']['name'] == "GO":
+                text = name
+                if reason:
+                    text = f"{name}({reason})"
 
-            if mtype == "COACH":
-                who_coach_go.add(text)
-            elif mtype == "GUEST":
-                who_guest_go.add(text)
+                if mtype == "COACH":
+                    who_coach_go.add(text)
+                elif mtype == "GUEST":
+                    who_guest_go.add(text)
+                else:
+                    who_go.add(text)
+            elif member['attendance']['name'] == "NOT_GO":
+                text = name
+                if reason:
+                    text = f"{name}({reason})"
+                who_not_go.add(text)
             else:
-                who_go.add(text)
-        elif member['attendance']['name'] == "NOT_GO":
-            text = name
-            if reason:
-                text = f"{name}({reason})"
-            who_not_go.add(text)
+                who_not_sure.add(name)
         else:
             who_not_sure.add(name)
 

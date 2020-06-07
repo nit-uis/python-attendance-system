@@ -5,7 +5,7 @@ from entities.exceptions import MemberError, EventError, Unauthorized
 from utils import ts, log, formatter
 from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, InlineQueryHandler, CallbackQueryHandler
-from services import member as member_service, event as event_service
+from services import member as member_service, event as event_service, security
 import traceback
 import json
 
@@ -35,14 +35,12 @@ def get_updates():
     start_handler = CommandHandler('start', handle_start)
     member_handler = CommandHandler('member', handle_member)
     event_handler = CommandHandler('event', handle_event)
-    help_handler = CommandHandler('help', handle_help)
     input_handler = MessageHandler(Filters.text & (~Filters.command), handle_input)
     button_handler = CallbackQueryHandler(handle_button)
 
     dispatcher.add_handler(start_handler)
     dispatcher.add_handler(member_handler)
     dispatcher.add_handler(event_handler)
-    dispatcher.add_handler(help_handler)
     dispatcher.add_handler(input_handler)
     dispatcher.add_handler(button_handler)
 
@@ -157,6 +155,7 @@ def set_footprint(tg_id, command: str, subcommand: str = '', data_map: dict = di
 # handle /member
 def handle_member(update, context):
     tg_id = update.effective_user.id
+    security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
 
     keyboard = [
         [InlineKeyboardButton("睇某成員資料", callback_data='detail')],
@@ -174,43 +173,161 @@ def handle_member(update, context):
 
 
 # handle subcommand
-def _handle_member(update, context):
+def _handle_member(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
     fp = get_footprint(tg_id)
-    db_members = member_service.find_by_tg_id(tg_group_id=TG_GROUP_ID, tg_id=tg_id, status=["ACTIVE"])
-    if not db_members:
-        raise Unauthorized(f"{tg_id} is trying to access member")
 
     if "detail" == fp['subcommand']:
-        _handle_member_detail(update, context, db_members[0])
+        _handle_member_detail(update, context, authorized_member)
     elif "delete" == fp['subcommand']:
-        _handle_member_delete(update, context, db_members[0])
+        _handle_member_delete(update, context, authorized_member)
     elif "approve" == fp['subcommand']:
-        _handle_member_approve(update, context, db_members[0])
+        _handle_member_approve(update, context, authorized_member)
     elif "stats" == fp['subcommand']:
-        _handle_member_stats(update, context, db_members[0])
+        _handle_member_stats(update, context, authorized_member)
 
 
-def _handle_member_detail(update, context, request_member):
+def get_member(tg_id, context):
+    if not (fp := get_footprint(tg_id)):
+        raise MemberError("no fp")
+
+    if 'member_id' in fp and (member_id := fp['member_id']):
+        db_members = member_service.find_by_member_id(tg_group_id=TG_GROUP_ID, member_id=member_id, status=["ACTIVE"])
+        if db_members:
+            return db_members[0]
+
+    if 'input' in fp and (name := fp['input']):
+        db_members = member_service.find_by_name(tg_group_id=TG_GROUP_ID, name=name, status=["ACTIVE"])
+        if db_members:
+            return db_members[0]
+
+    context.bot.send_message(chat_id=tg_id, text="邊個? (請輸入成員名)")
+    return None
+
+
+def get_confirm_input(tg_id, context):
+    if not (fp := get_footprint(tg_id)):
+        raise MemberError("no fp")
+
+    if 'input' not in fp or (y_n := fp['input']) not in ["Y", "N", "y", "n"]:
+        context.bot.send_message(chat_id=tg_id, text="真係要delete? (Y/N)")
+        return None
+    print("y_n", y_n)
+
+    if y_n == "Y" or y_n == "y":
+        return 1
+    else:
+        return 2
+
+
+def get_event(tg_id, context):
+    if not (fp := get_footprint(tg_id)):
+        raise EventError("no fp")
+
+    if 'event_id' in fp and (event_id := fp['event_id']):
+        db_events = event_service.find_by_id(tg_group_id=TG_GROUP_ID, event_id=event_id, status=["ACTIVE"])
+        if db_events:
+            return db_events[0]
+
+    if 'input' in fp and (date := fp['input']):
+        date = f"{date} +0800"
+        db_events = event_service.find_by_date(tg_group_id=TG_GROUP_ID, date=date, status=["ACTIVE"])
+        if len(db_events) > 1:
+            keyboard = [[InlineKeyboardButton(formatter.format_event(i, 1), callback_data=i['uuid'])] for i in
+                        db_events]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            context.bot.send_message(chat_id=tg_id, text="邊個?", reply_markup=reply_markup)
+            set_footprint(tg_id=tg_id, command='event', data_map={"choose": "event_id", "input": ""})
+            return None
+        elif len(db_events) == 1:
+            return db_events[0]
+
+    context.bot.send_message(chat_id=tg_id, text="邊日? (Eg. 2020-05-31)")
+
+
+def get_time_input(tg_id, context):
+    if not (fp := get_footprint(tg_id)):
+        raise EventError("no fp")
+
+    if 'input' in fp and (time := re.search(r'[0-2][0-9]:[0-5][0-9]', fp['input'])):
+        return time[0]
+
+    context.bot.send_message(chat_id=tg_id, text="幾點? 要跟番呢個格式 (Eg. 15:00)")
+
+
+def get_date_input(tg_id, context):
+    if not (fp := get_footprint(tg_id)):
+        raise EventError("no fp")
+
+    if 'input' in fp and (date := re.search(r'\d{4}-[0-1][0-9]-[0-3][0-9]', fp['input'])):
+        return f"{date[0]} +0800"
+
+    context.bot.send_message(chat_id=tg_id, text="邊日? (Eg. 2020-05-30)")
+
+
+def get_name_input(tg_id, context):
+    if not (fp := get_footprint(tg_id)):
+        raise EventError("no fp")
+
+    if 'input' in fp and (name := fp['input']):
+        return name
+
+    context.bot.send_message(chat_id=tg_id, text="咩名?")
+
+
+def get_names_input(tg_id, context):
+    if not (fp := get_footprint(tg_id)):
+        raise EventError("no fp")
+
+    if 'input' in fp and (names := fp['input']):
+        splitted_names = names.split(",")
+        if len(splitted_names) == 1:
+            splitted_names = names.split("，")
+        return splitted_names
+
+    context.bot.send_message(chat_id=tg_id, text="邊個? (可以打多幾個名, Eg: lydia, tszwai)")
+
+
+def get_venue_input(tg_id, context):
+    if not (fp := get_footprint(tg_id)):
+        raise EventError("no fp")
+
+    if 'input' in fp and (venue := fp['input']):
+        return venue
+
+    context.bot.send_message(chat_id=tg_id, text="邊度? (Eg. 花墟/巴富街/花園街體育館/其他地方)")
+
+
+def get_event_type(tg_id, context):
+    if not (fp := get_footprint(tg_id)):
+        raise EventError("no fp")
+
+    if 'input' in fp and (etype := formatter.deformat_event_type(fp['input'])):
+        print(etype)
+        return etype
+
+    db_event_types = event_service.find_event_types(tg_group_id=TG_GROUP_ID, status=["ACTIVE"])
+    if not db_event_types:
+        context.bot.send_message(chat_id=tg_id, text="搵唔到相關活動")
+        return
+
+    db_event_types = "/".join([formatter.format_event_type(i) for i in db_event_types])
+
+    context.bot.send_message(chat_id=tg_id, text=f"邊類? (Eg. {db_event_types})")
+
+
+def _handle_member_detail(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
     fp = get_footprint(tg_id)
 
     # validate
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="要睇邊個? (請輸入成員名)")
+    if not (db_member := get_member(tg_id, context)):
         return
 
-    name = fp['input']
-    db_members = member_service.find_by_name(tg_group_id=TG_GROUP_ID, name=name, status=["ACTIVE"])
-    if not db_members:
-        context.bot.send_message(chat_id=tg_id, text="打多次個名?")
-        return
-
-    text = formatter.format_member(db_members[0])
-    if member_service.is_admin(request_member['type']):
-        # todo handle command
+    text = formatter.format_member(db_member)
+    if security.is_admin(authorized_member):
         keyboard = [
             [InlineKeyboardButton('delete', callback_data='delete'),
              InlineKeyboardButton('stats', callback_data='stats')],
@@ -218,93 +335,91 @@ def _handle_member_detail(update, context, request_member):
              InlineKeyboardButton('auto <黎>', callback_data='go')],
         ]
     else:
-        keyboard = [
-            [InlineKeyboardButton('stats', callback_data='stats')],
-            [InlineKeyboardButton('auto <唔黎>', callback_data='not_go'),
-             InlineKeyboardButton('auto <黎>', callback_data='go')],
-        ]
+        if db_member['uuid'] == authorized_member['uuid']:
+            keyboard = [
+                [InlineKeyboardButton('stats', callback_data='stats')],
+                # todo handle command
+                [InlineKeyboardButton('auto <唔黎>', callback_data='not_go'),
+                 # todo handle command
+                 InlineKeyboardButton('auto <黎>', callback_data='go')],
+                # todo handle command
+                [InlineKeyboardButton('改名', callback_data='name'),
+                 # todo handle command
+                 InlineKeyboardButton('改生日', callback_data='bday')],
+            ]
+        else:
+            keyboard = [
+                [InlineKeyboardButton('stats', callback_data='stats')],
+            ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     context.bot.send_message(chat_id=tg_id, text=text, reply_markup=reply_markup)
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='member', data_map={'member_id': db_members[0]['uuid'], 'input': ''})
+    set_footprint(tg_id=tg_id, command='member', data_map={'member_id': db_member['uuid'], 'input': ''})
 
 
-def _handle_member_delete(update, context, request_member):
+def _handle_member_delete(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to delete someone")
-
-    if 'member_id' not in fp or not fp['member_id']:
-        context.bot.send_message(chat_id=tg_id, text="冇人要delete wo")
+    security.authorize_admin(authorized_member)
+    if not (db_member := get_member(tg_id, context)):
         return
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="真係要delete? (Y/N)")
-        return
-    elif 'Y' not in fp['input'] and 'y' not in fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="唔delete lu")
-        set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    if not (confirm := get_confirm_input(tg_id, context)):
         return
 
-    member_id = fp['member_id']
-    db_members = member_service.update_status(tg_group_id=TG_GROUP_ID, member_id=member_id, status="INACTIVE")
-    if db_members:
-        context.bot.send_message(chat_id=tg_id, text=f"deleted {db_members[0]['name']}")
+    if confirm == 1:
+        db_members = member_service.update_status(tg_group_id=TG_GROUP_ID, member_id=db_member['uuid'], status="INACTIVE")
+        if db_members:
+            context.bot.send_message(chat_id=tg_id, text=f"deleted {db_members[0]['name']}")
+        else:
+            context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+            raise MemberError("cannot delete member")
     else:
-        context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
-        raise MemberError("cannot delete member")
+        context.bot.send_message(chat_id=tg_id, text="撤回")
 
     # update footprint
     set_footprint(tg_id=tg_id, command='member', data_map={'input': ''})
 
 
-def _handle_member_approve(update, context, request_member):
+def _handle_member_approve(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
+    # todo remove this
     fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to approve someone")
-    if 'member_id' not in fp or not fp['member_id']:
-        context.bot.send_message(chat_id=tg_id, text="冇人要approve wo")
+    security.authorize_admin(authorized_member)
+    if not (db_member := get_member(tg_id, context)):
         return
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="真係要approve? (Y/N)")
-        return
-    elif 'Y' not in fp['input'] and 'y' not in fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="已經reject了")
-        set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    if not (confirm := get_confirm_input(tg_id, context)):
         return
 
-    member_id = fp['member_id']
-    db_members = member_service.update_status(tg_group_id=TG_GROUP_ID, member_id=member_id, status="ACTIVE")
-    if db_members:
-        context.bot.send_message(chat_id=db_members[0]['tgId'], text="歡迎你既加入")
-        context.bot.send_message(chat_id=TG_GROUP_ID, text=f"歡迎 {db_members[0]['name']} 成功加入我地既一份子")
+    if confirm == 1:
+        db_members = member_service.update_status(tg_group_id=TG_GROUP_ID, member_id=db_member['uuid'], status="ACTIVE")
+        if db_members:
+            context.bot.send_message(chat_id=db_members[0]['tgId'], text="歡迎你既加入")
+            context.bot.send_message(chat_id=TG_GROUP_ID, text=f"歡迎 {db_members[0]['name']} 成功加入我地既一份子")
+        else:
+            context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+            raise MemberError("cannot approve member")
     else:
-        context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
-        raise MemberError("cannot approve member")
+        context.bot.send_message(chat_id=tg_id, text="撤回")
 
     # update footprint
     set_footprint(tg_id=tg_id, command='member', data_map={'input': ''})
 
 
-def _handle_member_stats(update, context, request_member):
+def _handle_member_stats(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if 'member_id' not in fp or not (member_id := fp['member_id']):
-        context.bot.send_message(chat_id=tg_id, text="我頭痛快啲帶我睇醫生")
+    if not (db_member := get_member(tg_id, context)):
         return
 
-    db_stats = event_service.find_stats_by_member(tg_group_id=TG_GROUP_ID, member_id=member_id, status=["ACTIVE"])
+    db_stats = event_service.find_stats_by_member(tg_group_id=TG_GROUP_ID, member_id=db_member['uuid'], status=["ACTIVE"])
 
     text = formatter.format_member_stats(db_stats[0])
     context.bot.send_message(chat_id=tg_id, text=text)
@@ -314,12 +429,30 @@ def _handle_member_stats(update, context, request_member):
 
 
 def handle_me(update, context):
-    tg_id = str(update.effective_user.id).strip()
-    _handle_member(update, context, tg_id)
+    tg_id = update.effective_user.id
+    db_member = security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
+
+    set_footprint(tg_id=tg_id, command='member', data_map={'member_id': db_member['uuid']})
+    _handle_member_detail(update, context, db_member)
+
+    keyboard = [
+        [InlineKeyboardButton("睇某成員資料", callback_data='detail')],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    db_members = member_service.list(tg_group_id=TG_GROUP_ID, status=["ACTIVE"])
+    members = formatter.format_members(db_members)
+    if not members:
+        members = "冇晒人lu.."
+
+    set_footprint(tg_id=tg_id, command='member', subcommand='', clean_user_data=True)
+
+    update.message.reply_text(members, reply_markup=reply_markup)
 
 
 def handle_event(update, context):
     tg_id = update.effective_user.id
+    security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
 
     # find coming events
     db_events = event_service.find_coming(TG_GROUP_ID)
@@ -342,90 +475,61 @@ def handle_event(update, context):
     update.message.reply_text(dates, reply_markup=reply_markup)
 
 
-def _handle_event(update, context):
+def _handle_event(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
     fp = get_footprint(tg_id)
-    db_members = member_service.find_by_tg_id(tg_group_id=TG_GROUP_ID, tg_id=tg_id, status=["ACTIVE"])
-    if not db_members:
-        raise Unauthorized(f"{tg_id} is trying to access event")
 
     if "detail" == fp['subcommand']:
-        _handle_event_detail(update, context, db_members[0])
+        _handle_event_detail(update, context, authorized_member)
     elif "list" == fp['subcommand']:
-        _handle_event_list(update, context, db_members[0])
+        _handle_event_list(update, context, authorized_member)
     elif "attend" == fp['subcommand']:
-        _handle_event_attend(update, context, db_members[0])
+        _handle_event_attend(update, context, authorized_member)
     elif "delete" == fp['subcommand']:
-        _handle_event_delete(update, context, db_members[0])
+        _handle_event_delete(update, context, authorized_member)
     elif "start" == fp['subcommand']:
-        _handle_event_time(update, context, db_members[0], start=True)
+        _handle_event_time(update, context, authorized_member, start=True)
     elif "end" == fp['subcommand']:
-        _handle_event_time(update, context, db_members[0], start=False)
+        _handle_event_time(update, context, authorized_member, start=False)
     elif "type" == fp['subcommand']:
-        _handle_event_type(update, context, db_members[0])
+        _handle_event_type(update, context, authorized_member)
     elif "date" == fp['subcommand']:
-        _handle_event_date(update, context, db_members[0])
+        _handle_event_date(update, context, authorized_member)
     elif "name" == fp['subcommand']:
-        _handle_event_name(update, context, db_members[0])
+        _handle_event_name(update, context, authorized_member)
     elif "venue" == fp['subcommand']:
-        _handle_event_venue(update, context, db_members[0])
+        _handle_event_venue(update, context, authorized_member)
     elif "guest" == fp['subcommand']:
-        _handle_event_guest(update, context, db_members[0])
+        _handle_event_guest(update, context, authorized_member)
     elif "go" == fp['subcommand']:
-        _handle_event_attendance(update, context, db_members[0], "GO")
+        _handle_event_attendance(update, context, authorized_member, "GO")
     elif "not_go" == fp['subcommand']:
-        _handle_event_attendance(update, context, db_members[0], "NOT_GO")
+        _handle_event_attendance(update, context, authorized_member, "NOT_GO")
     elif "not_sure" == fp['subcommand']:
-        _handle_event_attendance(update, context, db_members[0], "NOT_SURE")
+        _handle_event_attendance(update, context, authorized_member, "NOT_SURE")
     elif "bring" == fp['subcommand']:
-        _handle_event_ball(update, context, db_members[0], "BRING")
+        _handle_event_ball(update, context, authorized_member, "BRING")
     elif "get" == fp['subcommand']:
-        _handle_event_ball(update, context, db_members[0], "GET")
+        _handle_event_ball(update, context, authorized_member, "GET")
     elif "send" == fp['subcommand']:
-        _handle_event_send(update, context, db_members[0])
+        _handle_event_send(update, context, authorized_member)
     elif "create" == fp['subcommand']:
-        _handle_event_create(update, context, db_members[0])
+        _handle_event_create(update, context, authorized_member)
     elif "duplicate" == fp['subcommand']:
-        _handle_event_duplicate(update, context, db_members[0])
+        _handle_event_duplicate(update, context, authorized_member)
 
 
-def _handle_event_detail(update, context, request_member):
+def _handle_event_detail(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if ('input' not in fp or not fp['input']) and ('date' not in fp or not fp['date']) and ('event_id' not in fp or not fp['event_id']):
-        context.bot.send_message(chat_id=tg_id, text="邊日? (Eg. 2020-05-31)")
+    if not (db_event := get_event(tg_id, context)):
         return
 
-    if 'input' in fp and fp['input']:
-        date = f"{fp['input']} +0800"
-        db_events = event_service.find_by_date(tg_group_id=TG_GROUP_ID, date=date, status=["ACTIVE"])
-    elif 'date' in fp and fp['date']:
-        # fixme sometimes cant find existing events, time range has bugs?
-        date = f"{fp['date']} +0800"
-        db_events = event_service.find_by_date(tg_group_id=TG_GROUP_ID, date=date, status=["ACTIVE"])
-    elif 'event_id' in fp and fp['event_id']:
-        event_id = fp['event_id']
-        db_events = event_service.find_by_id(tg_group_id=TG_GROUP_ID, event_id=event_id, status=["ACTIVE"])
-    else:
-        context.bot.send_message(chat_id=tg_id, text="打多次日期?")
-        return
-
-    if not db_events:
-        context.bot.send_message(chat_id=tg_id, text="打多次日期?")
-        return
-    elif len(db_events) > 1:
-        keyboard = [[InlineKeyboardButton(formatter.format_event(i, 1), callback_data=i['uuid'])] for i in db_events]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        context.bot.send_message(chat_id=tg_id, text="邊個?", reply_markup=reply_markup)
-        set_footprint(tg_id=tg_id, command='event', data_map={"choose": "event_id", "input": ""})
-        return
-
-    text = formatter.format_event(db_events[0], expand=3)
-    if member_service.is_admin(request_member['type']):
+    text = formatter.format_event(db_event, expand=3)
+    if security.is_admin(authorized_member):
         keyboard = [
             [InlineKeyboardButton('改event種類', callback_data='type'),
              InlineKeyboardButton('幾點開始', callback_data='start'),
@@ -455,28 +559,16 @@ def _handle_event_detail(update, context, request_member):
         context.bot.send_message(chat_id=tg_id, text=text)
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={"event_id": db_events[0]['uuid'], "input": "", "choose": ""})
+    set_footprint(tg_id=tg_id, command='event', data_map={"event_id": db_event['uuid'], "input": "", "choose": ""})
 
 
-def _handle_event_list(update, context, request_member):
+# todo paging
+def _handle_event_list(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
-
-    # get event type list
-    db_event_types = event_service.find_event_types(tg_group_id=TG_GROUP_ID, status=["ACTIVE"])
-    if not db_event_types:
-        context.bot.send_message(chat_id=tg_id, text="搵唔到相關活動")
-        return
-
-    db_event_types = "/".join([formatter.format_event_type(i) for i in db_event_types])
 
     # validate
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text=f"邊類? (Eg. {db_event_types})")
-        return
-    if not (etype := formatter.deformat_event_type(fp['input'])):
-        context.bot.send_message(chat_id=tg_id, text=f"冇呢類,試下 {db_event_types})")
+    if not (etype := get_event_type(tg_id, context)):
         return
 
     db_events = event_service.find_by_event_type(tg_group_id=TG_GROUP_ID, etype=etype, status=["ACTIVE"])
@@ -495,7 +587,7 @@ def _handle_event_list(update, context, request_member):
     set_footprint(tg_id=tg_id, command='event', data_map={"input": ""})
 
 
-def _handle_event_attend(update, context, request_member):
+def _handle_event_attend(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
     fp = get_footprint(tg_id)
@@ -537,65 +629,46 @@ def _handle_event_attend(update, context, request_member):
     set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
 
 
-def _handle_event_delete(update, context, request_member):
+def _handle_event_delete(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to delete some events")
-
-    if 'event_id' not in fp or not fp['event_id']:
-        context.bot.send_message(chat_id=tg_id, text="冇event要delete wo")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
         return
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="真係要delete? (Y/N)")
-        return
-    elif 'Y' not in fp['input'] and 'y' not in fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="唔delete lu")
-        set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    if not (confirm := get_confirm_input(tg_id, context)):
         return
 
-    event_id = fp['event_id']
-    db_events = event_service.update_status(tg_group_id=TG_GROUP_ID, event_id=event_id, status="INACTIVE")
-    if db_events:
-        context.bot.send_message(chat_id=tg_id, text=f"deleted {ts.to_string_hkt(db_events[0]['date'], format=LOCAL_DATE_FORMAT)}")
+    if confirm == 1:
+        db_events = event_service.update_status(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], status="INACTIVE")
+        if db_events:
+            context.bot.send_message(chat_id=tg_id, text=f"deleted {ts.to_string_hkt(db_events[0]['date'], format=LOCAL_DATE_FORMAT)}")
+        else:
+            context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
+            raise EventError("cannot delete event")
     else:
-        context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
-        raise EventError("cannot delete event")
+        context.bot.send_message(chat_id=tg_id, text="撤回")
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
-def _handle_event_time(update, context, request_member, start: bool):
+def _handle_event_time(update, context, authorized_member, start: bool):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to update some events")
-
-    if 'event_id' not in fp or not fp['event_id']:
-        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
         return
-
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="幾點? (Eg. 14:00)")
+    if not (time := get_time_input(tg_id, context)):
         return
-    elif not re.search(r'[0-2][0-9]:[0-5][0-9]', fp['input']):
-        context.bot.send_message(chat_id=tg_id, text="幾點? 要跟番呢個格式 (Eg. 15:00)")
-        return
-
-    event_id = fp['event_id']
-    time = fp['input']
 
     if start:
-        db_events = event_service.update_start_time(tg_group_id=TG_GROUP_ID, event_id=event_id, start_time=time)
+        db_events = event_service.update_start_time(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], start_time=time)
     else:
-        db_events = event_service.update_end_time(tg_group_id=TG_GROUP_ID, event_id=event_id, end_time=time)
+        db_events = event_service.update_end_time(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], end_time=time)
     if db_events:
         context.bot.send_message(chat_id=tg_id, text=f"轉左時間去: {time}")
     else:
@@ -603,28 +676,21 @@ def _handle_event_time(update, context, request_member, start: bool):
         raise EventError("cannot update event time")
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
-def _handle_event_type(update, context, request_member):
+def _handle_event_type(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to send some events")
-    if 'event_id' not in fp or not fp['event_id']:
-        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
         return
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="轉邊種? (練習/FDLY/比賽/玩)")
+    if not (etype := get_event_type(tg_id, context)):
         return
 
-    event_id = fp['event_id']
-    etype = formatter.deformat_event_type(fp['input'])
-
-    db_events = event_service.update_type(tg_group_id=TG_GROUP_ID, event_id=event_id, etype=etype)
+    db_events = event_service.update_type(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], etype=etype)
     if db_events:
         context.bot.send_message(chat_id=tg_id, text=f"轉左種類去 {formatter.format_event_type(etype)}")
     else:
@@ -632,115 +698,85 @@ def _handle_event_type(update, context, request_member):
         raise EventError("cannot update event type")
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
-def _handle_event_date(update, context, request_member):
+def _handle_event_date(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to update some events")
-    if 'event_id' not in fp or not fp['event_id']:
-        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
         return
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="邊日? (Eg. 2020-05-31)")
+    if not (date := get_date_input(tg_id, context)):
         return
 
-    event_id = fp['event_id']
-    date = f"{fp['input']} +0800"
-
-    db_events = event_service.update_date(tg_group_id=TG_GROUP_ID, event_id=event_id, date=date)
+    db_events = event_service.update_date(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], date=date)
     if db_events:
-        context.bot.send_message(chat_id=tg_id, text=f"轉左去 {fp['input']}")
+        context.bot.send_message(chat_id=tg_id, text=f"OK")
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError("cannot update event type")
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
-def _handle_event_name(update, context, request_member):
+def _handle_event_name(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to update some events")
-    if 'event_id' not in fp or not fp['event_id']:
-        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
         return
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="想event叫咩名?")
+    if not (name := get_name_input(tg_id, context)):
         return
 
-    event_id = fp['event_id']
-    name = fp['input']
-
-    db_events = event_service.update_name(tg_group_id=TG_GROUP_ID, event_id=event_id, name=name)
+    db_events = event_service.update_name(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], name=name)
     if db_events:
-        context.bot.send_message(chat_id=tg_id, text=f"轉左去 {fp['input']}")
+        context.bot.send_message(chat_id=tg_id, text=f"OK")
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError("cannot update event name")
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
-def _handle_event_venue(update, context, request_member):
+def _handle_event_venue(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to update some events")
-    if 'event_id' not in fp or not fp['event_id']:
-        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
         return
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="邊度? (Eg. 花墟/巴富街/花園街體育館/其他地方)")
+    if not (venue := get_venue_input(tg_id, context)):
         return
 
-    event_id = fp['event_id']
-    venue = fp['input'].replace(" ", "")
-
-    db_events = event_service.update_venue(tg_group_id=TG_GROUP_ID, event_id=event_id, venue=venue)
+    db_events = event_service.update_venue(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], venue=venue)
     if db_events:
-        context.bot.send_message(chat_id=tg_id, text=f"轉左去 {fp['input']}")
+        context.bot.send_message(chat_id=tg_id, text=f"OK")
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError("cannot update event venue")
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
-def _handle_event_guest(update, context, request_member):
+def _handle_event_guest(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to update some events")
-    if 'event_id' not in fp or not fp['event_id']:
-        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
         return
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="邊個? (可以打多幾個名, Eg: lydia, tszwai)")
+    if not (names := get_names_input(tg_id, context)):
         return
-
-    event_id = fp['event_id']
-    names = fp['input'].split(",")
-    if len(names) == 1:
-        names = fp['input'].split("，")
 
     for name in names:
         name = name.strip()
@@ -749,7 +785,7 @@ def _handle_event_guest(update, context, request_member):
             context.bot.send_message(chat_id=tg_id, text=f"{name} 跟操失敗")
             continue
 
-        db_events = event_service.take_attendance(tg_group_id=TG_GROUP_ID, event_id=event_id, member_id=db_guest['uuid'], attendance="GO", reason='')
+        db_events = event_service.take_attendance(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], member_id=db_guest['uuid'], attendance="GO", reason='')
         if db_events:
             context.bot.send_message(chat_id=tg_id, text=f"加左 {name}")
         else:
@@ -757,28 +793,19 @@ def _handle_event_guest(update, context, request_member):
             raise EventError("cannot update event guest")
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
-def _handle_event_attendance(update, context, request_member, attendance):
+def _handle_event_attendance(update, context, authorized_member, attendance):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to update some events")
-    if 'event_id' not in fp or not fp['event_id']:
-        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
         return
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="邊個? (可以打多幾個名, Eg: lydia, tszwai)")
+    if not (names := get_names_input(tg_id, context)):
         return
-
-    event_id = fp['event_id']
-    names = fp['input'].split(",")
-    if len(names) == 1:
-        names = fp['input'].split("，")
 
     for name in names:
         name = name.strip()
@@ -787,7 +814,7 @@ def _handle_event_attendance(update, context, request_member, attendance):
             context.bot.send_message(chat_id=tg_id, text=f"加唔到 {name}")
             continue
 
-        db_events = event_service.take_attendance(tg_group_id=TG_GROUP_ID, event_id=event_id, member_id=db_members[0]['uuid'], attendance=attendance, reason='')
+        db_events = event_service.take_attendance(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], member_id=db_members[0]['uuid'], attendance=attendance, reason='')
         if db_events:
             context.bot.send_message(chat_id=tg_id, text=f"加左 {name}")
         else:
@@ -795,28 +822,19 @@ def _handle_event_attendance(update, context, request_member, attendance):
             raise EventError("cannot update event member attendance")
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
-def _handle_event_ball(update, context, request_member, action):
+def _handle_event_ball(update, context, authorized_member, action):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to update some events")
-    if 'event_id' not in fp or not fp['event_id']:
-        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
         return
-    if 'input' not in fp or not fp['input']:
-        context.bot.send_message(chat_id=tg_id, text="邊個? (可以打多幾個名, Eg: lydia, tszwai)")
+    if not (names := get_names_input(tg_id, context)):
         return
-
-    event_id = fp['event_id']
-    names = fp['input'].split(",")
-    if len(names) == 1:
-        names = fp['input'].split("，")
 
     for name in names:
         name = name.strip()
@@ -825,7 +843,7 @@ def _handle_event_ball(update, context, request_member, action):
             context.bot.send_message(chat_id=tg_id, text=f"加唔到 {name}")
             continue
 
-        db_events = event_service.take_ball(tg_group_id=TG_GROUP_ID, event_id=event_id, member_id=db_members[0]['uuid'], action=action)
+        db_events = event_service.take_ball(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], member_id=db_members[0]['uuid'], action=action)
         if db_events:
             context.bot.send_message(chat_id=tg_id, text=f"加左 {name}")
         else:
@@ -833,49 +851,39 @@ def _handle_event_ball(update, context, request_member, action):
             raise EventError("cannot update event ball")
 
     # update footprint
-    set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
-def _handle_event_send(update, context, request_member):
+def _handle_event_send(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to send some events")
-
-    if 'event_id' not in fp or not fp['event_id']:
-        context.bot.send_message(chat_id=tg_id, text="你肯定你簡好邊個event?")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
         return
 
-    event_id = fp['event_id']
-
-    db_events = event_service.find_by_id(tg_group_id=TG_GROUP_ID, event_id=event_id, status=["ACTIVE"])
-    if db_events:
-        context.bot.send_message(chat_id=TG_GROUP_ID, text=formatter.format_event(db_events[0], expand=3))
+    if db_event:
+        context.bot.send_message(chat_id=TG_GROUP_ID, text=formatter.format_event(db_event, expand=3))
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError("cannot send event")
 
     # update footprint
-    # set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
-def _handle_event_create(update, context, request_member):
+def _handle_event_create(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to create some events")
+    security.authorize_admin(authorized_member)
 
     db_events = event_service.create(tg_group_id=TG_GROUP_ID)
     if db_events:
         set_footprint(tg_id=tg_id, command='event', data_map={'event_id': db_events[0]['uuid']})
-        _handle_event_detail(update, context, request_member)
-        # context.bot.send_message(chat_id=tg_id, text=formatter.format_event(db_events[0], expand=3))
+        _handle_event_detail(update, context, authorized_member)
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError("cannot create event")
@@ -884,43 +892,31 @@ def _handle_event_create(update, context, request_member):
     # set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
 
 
-def _handle_event_duplicate(update, context, request_member):
+def _handle_event_duplicate(update, context, authorized_member):
     tg_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    fp = get_footprint(tg_id)
 
     # validate
-    if not member_service.is_admin(request_member['type']):
-        raise Unauthorized(f"{request_member['name']} is trying to duplicate some events")
-    if 'event_id' not in fp or not fp['event_id']:
-        raise EventError("cannot duplicate event, due to empty event_id")
+    security.authorize_admin(authorized_member)
+    if not (db_event := get_event(tg_id, context)):
+        return
 
-    event_id = fp['event_id']
-    db_events = event_service.create(tg_group_id=TG_GROUP_ID, event_id=event_id)
+    db_events = event_service.create(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'])
     if db_events:
         set_footprint(tg_id=tg_id, command='event', data_map={'event_id': db_events[0]['uuid']})
-        _handle_event_detail(update, context, request_member)
-        # context.bot.send_message(chat_id=tg_id, text=formatter.format_event(db_events[0], expand=3))
+        _handle_event_detail(update, context, authorized_member)
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError("cannot duplicate event")
 
     # update footprint
-    # set_footprint(tg_id=tg_id, command='event', data_map={'input': ''})
-
-
-def handle_help(update, context):
-    content = """
-    
-    """
-    context.bot.send_message(chat_id=update.effective_chat.id, text=content)
+    set_footprint(tg_id=tg_id, command='event', data_map={'input': '', "choose": ""})
 
 
 def handle_button(update, context):
     tg_id = update.effective_user.id
     query = update.callback_query
-    # print(query)
-    # print(update)
+    db_member = security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
 
     # handle group event command
     try:
@@ -938,32 +934,32 @@ def handle_button(update, context):
                 set_footprint(tg_id, command=fp[0], subcommand=fp[1], data_map=data_map)
 
                 if "event" == fp[0]:
-                    _handle_member(update, context)
+                    _handle_member(update, context, db_member)
     except:
         fp = get_footprint(tg_id)
 
         if "member" == fp['command']:
             set_footprint(tg_id, command='member', subcommand=query.data)
-            _handle_member(update, context)
+            _handle_member(update, context, db_member)
         elif "me" == fp['command']:
             set_footprint(tg_id, command='me', subcommand=query.data)
-            _handle_me(update, context)
+            _handle_me(update, context, db_member)
         elif "event" == fp['command']:
-            if 'choose' in fp and "event_id" == fp['choose']:
+            if 'choose' in fp and 'event_id' == fp['choose']:
                 set_footprint(tg_id, command='event', data_map={fp['choose']: query.data})
             else:
                 set_footprint(tg_id, command='event', subcommand=query.data)
 
-            _handle_event(update, context)
+            _handle_event(update, context, db_member)
     finally:
         # CallbackQueries need to be answered, even if no notification to the user is needed
         # Some clients may have trouble otherwise. See https://core.telegram.org/bots/api#callbackquery
         query.answer()
-    # {'id': '1424950175065221455', 'chat_instance': '-2484597087886404463', 'message': {'message_id': 28876, 'date': 1589608202, 'chat': {'id': 331772066, 'type': 'private', 'first_name': 'Deleted Account'}, 'text': 'Please choose:', 'entities': [], 'caption_entities': [], 'photo': [], 'new_chat_members': [], 'new_chat_photo': [], 'delete_chat_photo': False, 'group_chat_created': False, 'supergroup_chat_created': False, 'channel_chat_created': False, 'reply_markup': {'inline_keyboard': [[{'text': 'Option 1', 'callback_data': '1'}, {'text': 'Option 2', 'callback_data': '2'}], [{'text': 'Option 3', 'callback_data': '3'}]]}, 'from': {'id': 638988595, 'first_name': 'minerva', 'is_bot': True, 'username': 'minerva_hk_bot'}}, 'data': '2', 'from': {'id': 331772066, 'first_name': 'Deleted Account', 'is_bot': False, 'language_code': 'en'}}
 
 
 def handle_input(update, context):
     tg_id = update.effective_user.id
+    db_member = security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
 
     fp = get_footprint(tg_id)
     data_map = {'input': update.message.text.strip()}
@@ -971,13 +967,13 @@ def handle_input(update, context):
     if fp and 'command' in fp:
         if "member" == fp['command']:
             set_footprint(tg_id, command='member', data_map=data_map)
-            _handle_member(update, context)
+            _handle_member(update, context, db_member)
         elif "me" == fp['command']:
             set_footprint(tg_id, command='me', data_map=data_map)
-            _handle_me(update, context)
+            _handle_me(update, context, db_member)
         elif "event" == fp['command']:
             set_footprint(tg_id, command='event', data_map=data_map)
-            _handle_event(update, context)
+            _handle_event(update, context, db_member)
     else:
         context.bot.send_message(chat_id=tg_id, text="有咩事要搵我地admin?")
 

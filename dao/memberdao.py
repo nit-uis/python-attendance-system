@@ -25,9 +25,19 @@ def find(tg_group_id: str, status: list):
     return [i['member'] for i in results]
 
 
+def find_by_member_id(tg_group_id: str, member_id: str, status: list):
+    results = CLIENT.run("""
+        MATCH (member:TgMember{uuid: {member_id}, tgGroupId: {tg_group_id}}) 
+        WHERE member.status in {status}
+        RETURN member
+    """, {"tg_group_id": tg_group_id, "member_id": member_id, "status": status})
+
+    return [i['member'] for i in results]
+
+
 def find_by_tg_id(tg_group_id: str, tg_id: str, status: list):
     results = CLIENT.run("""
-        MATCH (member:TgMember{tgId: {tg_id}, tgGroupId: {tg_group_id}}) 
+        MATCH (member:TgMember{tgId: {tg_id}, tgGroupId: {tg_group_id}})
         WHERE member.status in {status}
         RETURN member
     """, {"tg_group_id": tg_group_id, "tg_id": tg_id, "status": status})

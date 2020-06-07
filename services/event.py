@@ -144,6 +144,7 @@ def create(tg_group_id, event_id=''):
         end_time = "23:59"
     db_events = eventdao.create(tg_group_id=tg_group_id, event=event, start_time=start_time, end_time=end_time, venue=venue)
     event_id = db_events[0]['uuid']
+    eventdao.reset_attendance(tg_group_id=tg_group_id, event_id=event_id, attendance="NOT_SURE", reason="", status=["ACTIVE"])
     eventdao.take_attendance_by_default(tg_group_id=tg_group_id, event_id=event_id, attendance="GO", reason="", status=["ACTIVE"])
     eventdao.take_attendance_by_default(tg_group_id=tg_group_id, event_id=event_id, attendance="NOT_GO", reason="", status=["ACTIVE"])
     return eventdao.find_by_id(tg_group_id=tg_group_id, event_id=event_id, status=["ACTIVE"])
