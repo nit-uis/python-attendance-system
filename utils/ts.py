@@ -1,6 +1,6 @@
-import re
-from datetime import datetime, timezone
+from datetime import datetime
 from time import time
+
 
 ONE_MINUTE_SECONDS = 60
 ONE_HOUR_SECONDS = ONE_MINUTE_SECONDS * 60
@@ -44,7 +44,7 @@ def get_second_range(time_second, interval_second):
     return int(time_second-interval_second), int(time_second+interval_second)
 
 
-def fromUtcnowToString(format):
+def from_utcnow_to_string(format):
     return datetime.utcfromtimestamp(time()).strftime(format)
 
 
@@ -66,10 +66,11 @@ def to_string_hkt(ts, format=END_DATE_FORMAT):
         return to_string(ts + EIGHT_HOUR_SECONDS, format)
 
 
-def compareTimestampWithUtcnow(ts):
+def compare_timestamp_with_utcnow(ts):
     return (datetime.utcnow()-ts).seconds
 
-def getUtcnowTs():
+
+def get_utcnow_ts():
     return datetime.utcnow()
 
 
@@ -78,7 +79,7 @@ def getUtcnowTs():
 
 
 # this is utc time on cloud server while it is utc - 8 time on localhost server DLLM
-def getUtcnowSeconds():
+def get_utcnow_seconds():
     return int('%.0f'%(datetime.utcnow().timestamp()))
 
 
@@ -89,11 +90,10 @@ def get_utc_now_in_ms():
 
 # this is hk time on cloud server while it is utc time on localhost server DLLM
 def get_hk_now_seconds():
-    return getUtcnowSeconds() + 60*60*8
-
+    return get_utcnow_seconds() + 60*60*8
 
 
 if __name__ == "__main__":
-    print(f'current getUtcnowTs={getUtcnowTs()}, getUtcnowSeconds={getUtcnowSeconds()}, get_hk_now_seconds={get_hk_now_seconds()}')
+    print(f'current get_utcnow_ts={get_utcnow_ts()}, get_utcnow_seconds={get_utcnow_seconds()}, get_hk_now_seconds={get_hk_now_seconds()}')
     print(to_seconds("2019/09/09 19:50 +0800", "%Y/%m/%d %H:%M %z"))
 

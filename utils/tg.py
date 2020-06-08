@@ -1,15 +1,13 @@
+import traceback
 import re
 
 from dao import settingdao
-from entities.exceptions import MemberError, EventError, Unauthorized
+from entities.exceptions import MemberError, EventError
 from utils import ts, log, formatter
-from telegram import InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, InlineQueryHandler, CallbackQueryHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 from services import member as member_service, event as event_service, security
-import traceback
-import json
 
-from utils.ts import DATE_WITH_WEEK_FORMAT, LOCAL_DATE_FORMAT
 
 TOKEN = ""
 SUPER_ADMIN_TG_IDS = []
@@ -522,7 +520,7 @@ def handle_event(update, context):
     db_events = event_service.find_coming(TG_GROUP_ID)
 
     # list coming event dates in yyyy-MM-dd
-    dates = '\n'.join([ts.to_string_hkt(i['date'], format=LOCAL_DATE_FORMAT) for i in db_events if i['date']])
+    dates = '\n'.join([ts.to_string_hkt(i['date'], format=ts.LOCAL_DATE_FORMAT) for i in db_events if i['date']])
     if not dates:
         dates = "最近冇event.."
 
@@ -636,7 +634,7 @@ def _handle_event_list(update, context, authorized_member):
         return
 
     db_events = event_service.find_by_event_type(tg_group_id=TG_GROUP_ID, etype=etype, status=["ACTIVE"])
-    dates = '\n'.join([ts.to_string_hkt(i['date'], format=LOCAL_DATE_FORMAT) for i in db_events if i['date']])
+    dates = '\n'.join([ts.to_string_hkt(i['date'], format=ts.LOCAL_DATE_FORMAT) for i in db_events if i['date']])
     if not dates:
         context.bot.send_message(chat_id=tg_id, text="搵唔到相關活動")
         return
@@ -706,7 +704,7 @@ def _handle_event_delete(update, context, authorized_member):
     if confirm == 1:
         db_events = event_service.update_status(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], status="INACTIVE")
         if db_events:
-            context.bot.send_message(chat_id=tg_id, text=f"deleted {ts.to_string_hkt(db_events[0]['date'], format=LOCAL_DATE_FORMAT)}")
+            context.bot.send_message(chat_id=tg_id, text=f"deleted {ts.to_string_hkt(db_events[0]['date'], format=ts.LOCAL_DATE_FORMAT)}")
         else:
             context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
             raise EventError("cannot delete event")

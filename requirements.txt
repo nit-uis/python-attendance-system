@@ -23,6 +23,7 @@ six==1.14.0               # via cryptography, neotime, protobuf
 telegram==0.0.1
 urllib3==1.25.9           # via requests
 wheel==0.34.2
+python-telegram-bot==12.7
 
 # The following packages are considered to be unsafe in a requirements file:
 # pip

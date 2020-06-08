@@ -1,17 +1,5 @@
-# {
-#   "tgGroupId": "-1001231961771",
-#   "tgId": "331772066",
-#   "name": "Siutin",
-#   "updateAt": 1548086346883,
-#   "type": "SUPER_ADMIN",
-#   "uuid": "74ed2535-0218-4b01-b3b1-49f7c61e7f87",
-#   "createAt": 1548086346883,
-#   "status": "ACTIVE"
-# }
 import re
 import textwrap
-from itertools import groupby
-from operator import itemgetter
 
 from entities.exceptions import EventError
 from utils import ts

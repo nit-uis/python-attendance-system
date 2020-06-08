@@ -21,6 +21,6 @@ def get_console_handler(formatter):
 
 
 def get_file_handler(name, formatter):
-    handler = TimedRotatingFileHandler(f"../{name}-{ts.fromUtcnowToString('%Y%m%d')}.log", when='midnight')
+    handler = TimedRotatingFileHandler(f"../{name}-{ts.from_utcnow_to_string('%Y%m%d')}.log", when='midnight')
     handler.setFormatter(formatter)
     return handler

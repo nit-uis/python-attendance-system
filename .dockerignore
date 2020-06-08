@@ -1,3 +1,9 @@
 .idea/
 docker.sh
 Dockerfile
+pas.pem
+.gitignore
+migration.txt
+README.md
+requirements.in
+/venv

@@ -2,8 +2,9 @@ import re
 import textwrap
 
 from neo4j import Driver
-from utils import ts, log
+from utils import log
 from db import neo4j
+
 
 CLIENT: Driver.session
 LOGGER = None

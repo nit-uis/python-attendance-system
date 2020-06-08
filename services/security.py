@@ -2,6 +2,7 @@ from entities.exceptions import Unauthorized
 from services.member import find_by_tg_id
 from utils import log
 
+
 LOGGER = None
 
 

@@ -2,6 +2,7 @@ from neo4j import GraphDatabase
 from configs import config
 from utils import log
 
+
 DRIVER: GraphDatabase.driver
 LOGGER = None
 

@@ -1,6 +1,7 @@
 from entities.exceptions import CacheError
 from utils import log
 
+
 LOGGER = None
 CACHE = None
 
