@@ -72,9 +72,13 @@ def format_member(member):
     """).strip()
 
 
-def format_members(members):
+def format_members(members, show_tg_id: bool = False):
     members = sorted(members, key=lambda item: item['name'])
-    return '\n'.join([m['name'] + format_member_type(m['type'], expand=0) for m in members]) + "\n\n*=admin, #=coach"
+    if show_tg_id:
+        members = [m['name'] + f"({m['tgId']})" + format_member_type(m['type'], expand=0) for m in members]
+    else:
+        members = [m['name'] + format_member_type(m['type'], expand=0) for m in members]
+    return '\n'.join(members) + "\n\n*=admin, #=coach"
 
 
 def format_event_type(etype):
@@ -219,92 +223,6 @@ def format_member_group_stats(stats: dict):
     gstats = "帶波排名(高>低): \n" + stats['get_stats'].strip()
 
     return astats + "\n\n" + bstats + "\n\n" + gstats
-
-
-def test():
-    test_str = {
-        "date": "1539129600000",
-        "venue": "朗屏體育館",
-        "members": [
-            {
-                "attendance": {
-                    "name": "GO",
-                    "reason": "late",
-                    "bring": True,
-                    "get": True
-                },
-                "tgGroupId": "-1001231961771",
-                "name": "Yan",
-                "tgId": "617799273",
-                "updateAt": 1548086347317,
-                "type": "GUEST",
-                "uuid": "78928faf-029b-445c-99de-561e9e46b76e",
-                "createAt": 1548086347317,
-                "status": "ACTIVE"
-            },
-            {
-                "attendance": {
-                    "name": "GO",
-                    "reason": "",
-                    "bring": False,
-                    "get": False
-                },
-                "tgGroupId": "-1001231961771",
-                "name": "In",
-                "tgId": "617799273",
-                "updateAt": 1548086347317,
-                "type": "COACH",
-                "uuid": "78928faf-029b-445c-99de-561e9e46b76e",
-                "createAt": 1548086347317,
-                "status": "ACTIVE"
-            },
-            {
-                "attendance": {
-                    "name": "NOT_GO",
-                    "reason": "not go",
-                    "bring": False,
-                    "get": False
-                },
-                "tgGroupId": "-1001231961771",
-                "name": "Ngasze",
-                "tgId": "229071615",
-                "updateAt": 1548086346999,
-                "type": "MEMBER",
-                "uuid": "e5dfab39-379f-472c-ae88-9f64f3c43f7a",
-                "createAt": 1548086346999,
-                "status": "ACTIVE"
-            },
-            {
-                "attendance": {
-                    "name": "NOT_SURE",
-                    "reason": "",
-                    "bring": False,
-                    "get": False
-                },
-                "tgGroupId": "-1001231961771",
-                "name": "MaN",
-                "tgId": "675035601",
-                "updateAt": 1548086347110,
-                "type": "MEMBER",
-                "uuid": "973aa170-78e8-491d-b972-67a3d521395f",
-                "createAt": 1548086347110,
-                "status": "ACTIVE"
-            },
-        ],
-        "name": "LIMIT",
-        "start": "20:00",
-        "updateAt": 1548086343683,
-        "end": "23:00",
-        "type": "PRACTICE",
-        "uuid": "77c0eb02-e8e5-4cd7-b8d1-65cb82b94155",
-        "createAt": 1548086343683,
-        "status": "ACTIVE"
-    }
-    print("---")
-    print(format_event(test_str, 3))
-    print("---")
-    print(format_event(test_str, 2))
-    print("---")
 
 
 # Yield successive n-sized

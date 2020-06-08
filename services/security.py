@@ -14,6 +14,10 @@ def is_admin(member):
     return 'type' in member and "ADMIN" in member['type']
 
 
+def is_super_admin(member):
+    return 'type' in member and "SUPER_ADMIN" == member['type']
+
+
 def authorize(tg_group_id, tg_id):
     db_members = find_by_tg_id(tg_group_id=tg_group_id, tg_id=tg_id, status=["ACTIVE"])
     if not db_members or db_members[0]['type'] not in ["MEMBER", "ADMIN", "COACH", "SUPER_ADMIN"]:

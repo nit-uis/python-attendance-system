@@ -26,7 +26,6 @@ def init(env):
     SUPER_ADMIN_TG_IDS = db_setting['superAdminTgIds']
     TG_GROUP_ID = db_setting['tgGroupId']
     LOGGER = log.get_logger("tg")
-    LOGGER.info(f"{SUPER_ADMIN_TG_IDS=}")
 
 
 def get_updates():
@@ -84,10 +83,8 @@ def monthly_stats(tg_id):
 
 
 def handle_start(update, context):
-    msg = ""
-    LOGGER.info(update)
+    # LOGGER.info(update)
     tg_id = str(update.effective_user.id).strip()
-    LOGGER.info(f"tg_id={tg_id}")
 
     db_members = member_service.find_by_tg_id(tg_group_id=TG_GROUP_ID, tg_id=tg_id, status=["ACTIVE", "INACTIVE"])
 
@@ -151,14 +148,26 @@ def set_footprint(tg_id, command: str, subcommand: str = '', data_map: dict = di
             if k != "command" and k != "subcommand":
                 fp[k] = ''
 
-    print("FOOTPRINT", FOOTPRINT)
+    LOGGER.info(f"{FOOTPRINT=}")
+
+
+def pre_handle(update, context):
+    tg_id = update.effective_user.id
+    db_member = security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
+
+    if update.callback_query:
+        text = "pressed with data=" + update.callback_query.data
+    else:
+        text = "entered " + update.message.text
+    context.bot.send_message(chat_id=SUPER_ADMIN_TG_IDS[0], text=f"{db_member['tgId']} {text}")
+    return db_member
 
 
 # navigate
 # handle /member
 def handle_member(update, context):
-    tg_id = update.effective_user.id
-    security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
+    db_member = pre_handle(update, context)
+    tg_id = db_member['tgId']
 
     keyboard = [
         [InlineKeyboardButton("睇某成員資料", callback_data='detail')],
@@ -166,7 +175,7 @@ def handle_member(update, context):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     db_members = member_service.list(tg_group_id=TG_GROUP_ID, status=["ACTIVE"])
-    members = formatter.format_members(db_members)
+    members = formatter.format_members(db_members, show_tg_id=security.is_super_admin(db_member))
     if not members:
         members = "冇晒人lu.."
 
@@ -497,8 +506,8 @@ def _handle_member_bday(update, context, authorized_member):
 
 
 def handle_me(update, context):
-    tg_id = update.effective_user.id
-    db_member = security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
+    db_member = pre_handle(update, context)
+    tg_id = db_member['tgId']
 
     set_footprint(tg_id=tg_id, command='member', subcommand='', clean_user_data=True)
     set_footprint(tg_id=tg_id, command='member', data_map={'member_id': db_member['uuid']})
@@ -506,8 +515,8 @@ def handle_me(update, context):
 
 
 def handle_event(update, context):
-    tg_id = update.effective_user.id
-    security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
+    db_member = pre_handle(update, context)
+    tg_id = db_member['tgId']
 
     # find coming events
     db_events = event_service.find_coming(TG_GROUP_ID)
@@ -968,9 +977,9 @@ def _handle_event_duplicate(update, context, authorized_member):
 
 
 def handle_button(update, context):
-    tg_id = update.effective_user.id
     query = update.callback_query
-    db_member = security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
+    db_member = pre_handle(update, context)
+    tg_id = db_member['tgId']
 
     # handle group event command
     try:
@@ -1012,9 +1021,8 @@ def handle_button(update, context):
 
 
 def handle_input(update, context):
-    tg_id = update.effective_user.id
-    db_member = security.authorize(tg_group_id=TG_GROUP_ID, tg_id=tg_id)
-
+    db_member = pre_handle(update, context)
+    tg_id = db_member['tgId']
     fp = get_footprint(tg_id)
     data_map = {'input': update.message.text.strip()}
 
@@ -1022,9 +1030,9 @@ def handle_input(update, context):
         if "member" == fp['command']:
             set_footprint(tg_id, command='member', data_map=data_map)
             _handle_member(update, context, db_member)
-        elif "me" == fp['command']:
-            set_footprint(tg_id, command='me', data_map=data_map)
-            _handle_me(update, context, db_member)
+        # elif "me" == fp['command']:
+        #     set_footprint(tg_id, command='me', data_map=data_map)
+        #     _handle_me(update, context, db_member)
         elif "event" == fp['command']:
             set_footprint(tg_id, command='event', data_map=data_map)
             _handle_event(update, context, db_member)
