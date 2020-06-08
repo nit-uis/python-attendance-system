@@ -5,4 +5,4 @@ LOGGER = None
 
 def init():
     global LOGGER
-    LOGGER = log.get_logger("member")
+    LOGGER = log.get_logger("memberGroup")

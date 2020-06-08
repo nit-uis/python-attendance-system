@@ -117,7 +117,7 @@ def handle_start(update, context):
 
 def get_footprint(tg_id):
     try:
-        print(FOOTPRINT[str(tg_id).strip()])
+        # print(FOOTPRINT[str(tg_id).strip()])
         return FOOTPRINT[str(tg_id).strip()]
     except KeyError:
         return None
@@ -127,7 +127,7 @@ def clear_footprint(tg_id):
     try:
         fp = get_footprint(tg_id)
         FOOTPRINT[str(tg_id).strip()] = {'command': fp['command'], 'subcommand': fp['subcommand']}
-        print("clear", FOOTPRINT)
+        # print("clear", FOOTPRINT)
     except KeyError:
         pass
 
@@ -151,7 +151,7 @@ def set_footprint(tg_id, command: str, subcommand: str = '', data_map: dict = di
             if k != "command" and k != "subcommand":
                 fp[k] = ''
 
-    print(FOOTPRINT)
+    print("FOOTPRINT", FOOTPRINT)
 
 
 # navigate
@@ -243,7 +243,6 @@ def get_confirm_input(tg_id, context):
     if 'input' not in fp or (y_n := fp['input']) not in ["Y", "N", "y", "n"]:
         context.bot.send_message(chat_id=tg_id, text="真係要delete? (Y/N)")
         return None
-    print("y_n", y_n)
 
     if y_n == "Y" or y_n == "y":
         return 1
@@ -334,7 +333,6 @@ def get_event_type(tg_id, context):
         raise EventError("no fp")
 
     if 'input' in fp and (etype := formatter.deformat_event_type(fp['input'])):
-        print(etype)
         return etype
 
     db_event_types = event_service.find_event_types(tg_group_id=TG_GROUP_ID, status=["ACTIVE"])
@@ -629,7 +627,6 @@ def _handle_event_list(update, context, authorized_member):
         return
 
     db_events = event_service.find_by_event_type(tg_group_id=TG_GROUP_ID, etype=etype, status=["ACTIVE"])
-    print(db_events)
     dates = '\n'.join([ts.to_string_hkt(i['date'], format=LOCAL_DATE_FORMAT) for i in db_events if i['date']])
     if not dates:
         context.bot.send_message(chat_id=tg_id, text="搵唔到相關活動")
