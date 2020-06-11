@@ -11,17 +11,16 @@ function push() {
       exit 1
     fi
 
-    gc-env-tech
-    docker build --build-arg GIT_TAG="${GIT_TAG}" -t nituis/pas:latest .
-    docker push nituis/pas:latest
+    docker build --build-arg GIT_TAG="${GIT_TAG}" -t nituis/pas-minerva:latest .
+#    docker push nituis/pas-minerva:latest
     #git push
 }
 
 function pull() {
-    docker pull nituis/pas:latest
+    docker pull nituis/pas-minerva:latest
     docker stop pas-minerva
     docker rm pas-minerva
-    docker run -d -e minerva --name pas-minerva nituis/pas:latest
+    docker run -d -e minerva --name pas-minerva nituis/pas-minerva:latest
     docker logs -f pas-minerva
 }
 
@@ -29,10 +28,10 @@ function test() {
 #    deactivate
     pip-compile requirements.in > requirements.txt
     GIT_TAG=$(git log -n 1 --pretty=format:%h)
-    docker build --no-cache --build-arg GIT_TAG="${GIT_TAG}" -t nituis/pas:latest .
+    docker build --no-cache --build-arg GIT_TAG="${GIT_TAG}" -t nituis/pas-minerva:latest .
     docker stop pas-minerva
     docker rm pas-minerva
-    docker run -e "ENV=local"  --name pas-minerva nituis/pas:latest
+    docker run -e "ENV=local"  --name pas-minerva nituis/pas-minerva:latest
 }
 
 function startNeo4j() {
@@ -56,6 +55,6 @@ case "$1" in
     startNeo4j
     ;;
   *)
-    echo "Usage: [push|pull]"
+    echo "Usage: [push|pull|test|startNeo4j]"
     ;;
 esac
