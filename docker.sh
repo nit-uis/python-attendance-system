@@ -12,7 +12,7 @@ function push() {
     fi
 
     docker build --build-arg GIT_TAG="${GIT_TAG}" -t nituis/pas-minerva:latest .
-#    docker push nituis/pas-minerva:latest
+    docker push nituis/pas-minerva:latest
     #git push
 }
 
