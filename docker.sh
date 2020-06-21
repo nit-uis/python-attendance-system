@@ -19,7 +19,7 @@ function pull() {
     docker pull nituis/pas-minerva:latest
     docker stop pas-minerva
     docker rm pas-minerva
-    docker run -d -e minerva --name pas-minerva --add-host neo4j-host:${DOCKER_NEO4J_HOST} nituis/pas-minerva:latest
+    docker run -d -e minerva --name pas-minerva --add-host localhost:${DOCKER_NEO4J_HOST} nituis/pas-minerva:latest
     docker logs -f pas-minerva
 }
 
