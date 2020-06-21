@@ -13,14 +13,13 @@ function push() {
 
     docker build --build-arg GIT_TAG="${GIT_TAG}" -t nituis/pas-minerva:latest .
     docker push nituis/pas-minerva:latest
-    #git push
 }
 
 function pull() {
     docker pull nituis/pas-minerva:latest
     docker stop pas-minerva
     docker rm pas-minerva
-    docker run -d -e minerva --name pas-minerva nituis/pas-minerva:latest
+    docker run -d -e minerva --name pas-minerva --add-host neo4j-host:${DOCKER_NEO4J_HOST} nituis/pas-minerva:latest
     docker logs -f pas-minerva
 }
 
