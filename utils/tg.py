@@ -1039,13 +1039,15 @@ def handle_input(update, context):
 
 
 def error(update, context):
+    tg_id = ""
     try:
         traceback.print_exc()
         tg_id = update.effective_user.id
         context.bot.send_message(chat_id=tg_id, text=str(context.error))
-        for sa_tg_id in SUPER_ADMIN_TG_IDS:
-            context.bot.send_message(chat_id=sa_tg_id, text=f"user({tg_id}): {context.error}")
     except Exception as e:
         if DEBUG_MODE:
             traceback.print_exc()
+    finally:
+        for sa_tg_id in SUPER_ADMIN_TG_IDS:
+            context.bot.send_message(chat_id=sa_tg_id, text=f"user({tg_id}): {context.error}")
 

@@ -53,6 +53,7 @@ def is_milliseconds(ts):
 
 
 def to_string(ts, format=END_DATE_FORMAT):
+    ts = int(ts)
     if is_milliseconds(ts):
         return datetime.utcfromtimestamp(ts / 1000).strftime(format)
     else:
@@ -60,6 +61,7 @@ def to_string(ts, format=END_DATE_FORMAT):
 
 
 def to_string_hkt(ts, format=END_DATE_FORMAT):
+    ts = int(ts)
     if is_milliseconds(ts):
         return to_string(ts + EIGHT_HOUR_SECONDS * 1000, format)
     else:
