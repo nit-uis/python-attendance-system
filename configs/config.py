@@ -14,20 +14,20 @@ def init():
     args = parser.parse_args()
     config = configparser.ConfigParser()
 
-    if args.env == "dev":
+    if "dev" in args.env:
         config.read("./configs/dev.ini")
-    elif args.env == "uat":
+    elif "uat" in args.env:
         config.read("./configs/uat.ini")
-    elif args.env == "prod":
+    elif "prod" in args.env:
         config.read("./configs/prod.ini")
-    elif args.env == "local":
+    elif "local" in args.env:
         config.read("./configs/local.ini")
-    elif args.env == "minerva":
+    elif "minerva" in args.env:
         config.read("./configs/minerva.ini")
     else:
         raise SystemExit('Error: 1 invalid environment argument.')
 
-    return args.env
+    return args.env.split("-")
 
 
 def reset():
