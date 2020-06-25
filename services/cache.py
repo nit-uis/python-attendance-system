@@ -23,7 +23,7 @@ def update(key, value):
     try:
         CACHE.update({key: value})
     except:
-        raise CacheError("cannot delete cache")
+        LOGGER.warning("cannot delete cache")
 
 
 def delete(key=None, bulk=False):
@@ -43,4 +43,4 @@ def delete(key=None, bulk=False):
             else:
                 CACHE.pop(key)
     except:
-        raise CacheError("cannot delete cache")
+        LOGGER.warning("cannot delete cache")

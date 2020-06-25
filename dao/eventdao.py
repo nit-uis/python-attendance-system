@@ -231,7 +231,7 @@ def take_ball(tg_group_id: str, event_id: str, member_id: str, action: str, stat
         MATCH (member:TgMember{uuid: $member_id}) 
         WHERE member.status in $status 
         MERGE (member)-[r:JOIN]->(event) 
-        SET r.createAt = timestamp(), r.bring = {bring}, r.get = {get}
+        SET r.createAt = timestamp(), r.bring = $bring, r.get = $get
         RETURN member 
     """, {"tg_group_id": tg_group_id,
           "event_id": event_id,
