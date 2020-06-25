@@ -51,6 +51,8 @@ def get_updates():
 
 
 def daily_msg():
+    LOGGER.info("start daily_msg")
+
     # find active and not passed event
     # for each events: print in expand=true format
     updater = Updater(token=TOKEN, use_context=True)
@@ -70,14 +72,16 @@ def daily_msg():
         updater.bot.send_message(chat_id=TG_GROUP_ID, text=text, reply_markup=reply_markup)
 
 
-def monthly_stats(tg_id):
+def monthly_stats():
+    LOGGER.info("start monthly_stats")
+
     # if today is the first day of month
-    now = ts.to_string(ts.get_hk_now_seconds())[6:8]
-    if now == "01" or True:
+    now = ts.to_string(ts.get_hk_now_seconds())[8:10]
+    if now == "01":
         db_stats = member_service.find_stats(tg_group_id=TG_GROUP_ID, mtypes=["COACH", "GUEST"], status=["ACTIVE"])
         text = formatter.format_member_group_stats(db_stats)
         updater = Updater(token=TOKEN, use_context=True)
-        updater.bot.send_message(chat_id=tg_id, text=text)
+        updater.bot.send_message(chat_id=TG_GROUP_ID, text=text)
 
 
 def handle_start(update, context):
@@ -999,19 +1003,17 @@ def handle_button(update, context):
     except:
         fp = get_footprint(tg_id)
 
-        if "member" == fp['command']:
-            set_footprint(tg_id, command='member', subcommand=query.data)
-            _handle_member(update, context, db_member)
-        elif "me" == fp['command']:
-            set_footprint(tg_id, command='me', subcommand=query.data)
-            _handle_me(update, context, db_member)
-        elif "event" == fp['command']:
-            if 'choose' in fp and 'event_id' == fp['choose']:
-                set_footprint(tg_id, command='event', data_map={fp['choose']: query.data})
-            else:
-                set_footprint(tg_id, command='event', subcommand=query.data)
+        if 'command' in fp:
+            if "member" == fp['command']:
+                set_footprint(tg_id, command='member', subcommand=query.data)
+                _handle_member(update, context, db_member)
+            elif "event" == fp['command']:
+                if 'choose' in fp and 'event_id' == fp['choose']:
+                    set_footprint(tg_id, command='event', data_map={fp['choose']: query.data})
+                else:
+                    set_footprint(tg_id, command='event', subcommand=query.data)
 
-            _handle_event(update, context, db_member)
+                _handle_event(update, context, db_member)
     finally:
         # CallbackQueries need to be answered, even if no notification to the user is needed
         # Some clients may have trouble otherwise. See https://core.telegram.org/bots/api#callbackquery
@@ -1028,9 +1030,6 @@ def handle_input(update, context):
         if "member" == fp['command']:
             set_footprint(tg_id, command='member', data_map=data_map)
             _handle_member(update, context, db_member)
-        # elif "me" == fp['command']:
-        #     set_footprint(tg_id, command='me', data_map=data_map)
-        #     _handle_me(update, context, db_member)
         elif "event" == fp['command']:
             set_footprint(tg_id, command='event', data_map=data_map)
             _handle_event(update, context, db_member)
