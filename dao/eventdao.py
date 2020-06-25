@@ -257,7 +257,7 @@ def update_start_time(tg_group_id: str, event_id: str, time: str):
     results = CLIENT.run("""
             MATCH (event:TgEvent{uuid: $event_id, status: "ACTIVE"})--(memberGroup:TgMemberGroup{tgGroupId: $tg_group_id, status:"ACTIVE"}) 
             MATCH (event)-[:START_AT]-(time:TgTime)
-            SET time.time = {time}, event.updateAt = timestamp()
+            SET time.time = $time, event.updateAt = timestamp()
             RETURN event
         """, {"tg_group_id": tg_group_id, "event_id": event_id, "time": time})
 
@@ -268,7 +268,7 @@ def update_end_time(tg_group_id: str, event_id: str, time: str):
     results = CLIENT.run("""
             MATCH (event:TgEvent{uuid: $event_id, status: "ACTIVE"})--(memberGroup:TgMemberGroup{tgGroupId: $tg_group_id, status:"ACTIVE"}) 
             MATCH (event)-[:END_AT]-(time:TgTime)
-            SET time.time = {time}, event.updateAt = timestamp()
+            SET time.time = $time, event.updateAt = timestamp()
             RETURN event
         """, {"tg_group_id": tg_group_id, "event_id": event_id, "time": time})
 
