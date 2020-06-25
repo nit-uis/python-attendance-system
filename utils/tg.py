@@ -324,6 +324,8 @@ def get_names_input(tg_id, context):
         splitted_names = names.split(",")
         if len(splitted_names) == 1:
             splitted_names = names.split("，")
+            if len(splitted_names) == 1:
+                splitted_names = names.split(" ")
         return splitted_names
 
     context.bot.send_message(chat_id=tg_id, text="邊個? (可以打多幾個名, Eg: lydia, tszwai)")
@@ -473,6 +475,9 @@ def _handle_member_name(update, context, authorized_member):
     if not (db_member := get_member(tg_id, context)):
         return
     if not (name := get_name_input(tg_id, context)):
+        return
+    if " " in name:
+        context.bot.send_message(chat_id=tg_id, text=f"名唔可以有空格, 打多次")
         return
 
     db_members = member_service.update_name(tg_group_id=TG_GROUP_ID, member_id=db_member['uuid'], name=name)
@@ -797,6 +802,9 @@ def _handle_event_name(update, context, authorized_member):
     if not (db_event := get_event(tg_id, context)):
         return
     if not (name := get_name_input(tg_id, context)):
+        return
+    if " " in name:
+        context.bot.send_message(chat_id=tg_id, text=f"名唔可以有空格, 打多次")
         return
 
     db_events = event_service.update_name(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], name=name)
