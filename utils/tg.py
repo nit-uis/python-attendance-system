@@ -538,8 +538,8 @@ def handle_event(update, context):
 
     # send msg with buttons, list all by EVENT_TYPE
     keyboard = [
-        [InlineKeyboardButton("睇唔同種類既event", callback_data='list')],
-        [InlineKeyboardButton("睇某event資料", callback_data='detail'),
+        [InlineKeyboardButton("睇某event資料", callback_data='detail')],
+        [InlineKeyboardButton("睇唔同種類既event", callback_data='list'),
          InlineKeyboardButton("新event", callback_data='create')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -580,9 +580,9 @@ def _handle_event(update, context, authorized_member):
     elif "not_sure" == fp['subcommand']:
         _handle_event_attendance(update, context, authorized_member, "NOT_SURE")
     elif "bring" == fp['subcommand']:
-        _handle_event_ball(update, context, authorized_member, "BRING")
+        _handle_event_ball(update, context, authorized_member, "bring")
     elif "get" == fp['subcommand']:
-        _handle_event_ball(update, context, authorized_member, "GET")
+        _handle_event_ball(update, context, authorized_member, "get")
     elif "send" == fp['subcommand']:
         _handle_event_send(update, context, authorized_member)
     elif "create" == fp['subcommand']:
@@ -918,7 +918,7 @@ def _handle_event_ball(update, context, authorized_member, action):
 
         db_events = event_service.take_ball(tg_group_id=TG_GROUP_ID, event_id=db_event['uuid'], member_id=db_members[0]['uuid'], action=action)
         if db_events:
-            context.bot.send_message(chat_id=tg_id, text=f"加左 {name}")
+            context.bot.send_message(chat_id=tg_id, text=f"{name} Ok")
         else:
             context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
             raise EventError("cannot update event ball")

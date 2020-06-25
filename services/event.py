@@ -162,7 +162,7 @@ def take_attendance(tg_group_id, event_id, member_id, attendance, reason):
 def take_ball(tg_group_id, event_id, member_id, action):
     if not tg_group_id or not event_id or not member_id or not action:
         return None
-    if action not in ["BRING", "GET"]:
+    if action not in ["bring", "get"]:
         raise EventError(f"invalid action({action})")
 
     db_events = eventdao.take_ball(tg_group_id=tg_group_id, event_id=event_id, member_id=member_id, action=action, status=["ACTIVE"])

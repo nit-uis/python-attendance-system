@@ -5,7 +5,6 @@ from neo4j import Driver
 from utils import log
 from db import neo4j
 
-
 CLIENT: Driver.session
 LOGGER = None
 
@@ -135,7 +134,6 @@ def find_most_common_end_time(tg_group_id, status: list):
     return [i['time'] for i in results]
 
 
-
 """
     UPDATE QUERY
 """
@@ -157,7 +155,8 @@ def create(tg_group_id: str, event: dict, start_time: str, end_time: str, venue:
             WITH event 
             MERGE (event)-[:END_AT]->(end:TgTime{time: $end_time}) 
             RETURN event
-    """), {"tg_group_id": tg_group_id, "start_time": start_time, "end_time": end_time, "venue": venue, "status": "ACTIVE"})
+    """), {"tg_group_id": tg_group_id, "start_time": start_time, "end_time": end_time, "venue": venue,
+           "status": "ACTIVE"})
 
     return [i['event'] for i in results]
 
@@ -218,27 +217,17 @@ def reset_attendance(tg_group_id: str, event_id: str, attendance: str, reason: s
 
 
 def take_ball(tg_group_id: str, event_id: str, member_id: str, action: str, status: list):
-    bring = False
-    get = False
-    if "BRING" == action:
-        bring = True
-    elif "GET" == action:
-        get = True
-
     results = CLIENT.run("""
         MATCH (event:TgEvent{uuid: $event_id})--(memberGroup:TgMemberGroup{tgGroupId: $tg_group_id}) 
         WHERE event.status in $status and memberGroup.status in $status 
         MATCH (member:TgMember{uuid: $member_id}) 
         WHERE member.status in $status 
-        MERGE (member)-[r:JOIN]->(event) 
-        SET r.createAt = timestamp(), r.bring = $bring, r.get = $get
-        RETURN member 
-    """, {"tg_group_id": tg_group_id,
-          "event_id": event_id,
-          "member_id": member_id,
-          "bring": bring,
-          "get": get,
-          "status": status})
+        MATCH (member)-[r:JOIN]->(event)
+    """ + f" SET r.{action} = not r.{action} RETURN member"
+                         , {"tg_group_id": tg_group_id,
+                            "event_id": event_id,
+                            "member_id": member_id,
+                            "status": status})
 
     return [i['member'] for i in results]
 
