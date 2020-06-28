@@ -50,6 +50,20 @@ def get_updates():
     updater.idle()
 
 
+def get_group_keyboard(event_id):
+    if not event_id:
+        raise EventError("no event id")
+
+    keyboard = [
+        [InlineKeyboardButton('黎', callback_data=f"event;attend;{event_id};GO"),
+         InlineKeyboardButton("遲黎", callback_data=f"event;attend;{event_id};LATE"),
+         InlineKeyboardButton("唔黎", callback_data=f"event;attend;{event_id};NOT_GO"),
+         InlineKeyboardButton("未知", callback_data=f"event;attend;{event_id};NOT_SURE"),
+         ],
+    ]
+    return keyboard
+
+
 def daily_msg():
     LOGGER.info("start daily_msg")
 
@@ -61,13 +75,7 @@ def daily_msg():
     for event in db_events:
         text = formatter.format_event(event, expand=3)
         event_id = event['uuid']
-        keyboard = [
-            [InlineKeyboardButton('黎', callback_data=f"event;attend;{event_id};GO"),
-             InlineKeyboardButton("遲黎", callback_data=f"event;attend;{event_id};LATE"),
-             InlineKeyboardButton("唔黎", callback_data=f"event;attend;{event_id};NOT_GO"),
-             InlineKeyboardButton("未知", callback_data=f"event;attend;{event_id};NOT_SURE"),
-             ],
-        ]
+        keyboard = get_group_keyboard(event_id=event_id)
         reply_markup = InlineKeyboardMarkup(keyboard)
         updater.bot.send_message(chat_id=TG_GROUP_ID, text=text, reply_markup=reply_markup)
 
@@ -690,7 +698,9 @@ def _handle_event_attend(update, context, authorized_member):
     db_events = event_service.find_by_id(tg_group_id=TG_GROUP_ID, event_id=event_id, status=["ACTIVE"])
     if db_events:
         text = formatter.format_event(db_events[0], expand=2)
-        context.bot.send_message(chat_id=TG_GROUP_ID, text=text)
+        keyboard = get_group_keyboard(event_id=event_id)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        context.bot.send_message(chat_id=TG_GROUP_ID, text=text, reply_markup=reply_markup)
     else:
         context.bot.send_message(chat_id=tg_id, text=f"我肚痛快啲帶我睇醫生")
         raise EventError(f"cannot attend event")
