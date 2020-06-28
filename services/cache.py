@@ -12,6 +12,13 @@ def init():
     LOGGER = log.get_logger("cache")
 
 
+def keys():
+    try:
+        return CACHE.keys()
+    except:
+        LOGGER.warning("no cache keys")
+
+
 def get(key):
     try:
         return CACHE[key]

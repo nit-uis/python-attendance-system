@@ -176,7 +176,7 @@ def handle_member(update, context):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    db_members = member_service.list(tg_group_id=TG_GROUP_ID, status=["ACTIVE"])
+    db_members = member_service.list(tg_group_id=TG_GROUP_ID, mtypes=["ADMIN", "MEMBER", "COACH", "SUPER_ADMIN"], status=["ACTIVE"])
     members = formatter.format_members(db_members, show_tg_id=security.is_super_admin(db_member))
     if not members:
         members = "冇晒人lu.."
@@ -993,21 +993,18 @@ def handle_button(update, context):
 
     # handle group event command
     try:
-        chat_type = update['message']['chat']['type']
-
-        if "group" in chat_type:
-            fp = query.data.split(";")
+        bulk_data = query.data.split(";")
+        if len(bulk_data) > 1:
             data_map = {
                 'member_id': tg_id,
-                'event_id': fp[2],
-                'attendance': fp[3]
+                'event_id': bulk_data[2],
+                'attendance': bulk_data[3]
             }
 
-            if fp:
-                set_footprint(tg_id, command=fp[0], subcommand=fp[1], data_map=data_map)
+            set_footprint(tg_id, command=bulk_data[0], subcommand=bulk_data[1], data_map=data_map)
 
-                if "event" == fp[0]:
-                    _handle_member(update, context, db_member)
+            if "event" == bulk_data[0]:
+                _handle_event(update, context, db_member)
     except:
         fp = get_footprint(tg_id)
 

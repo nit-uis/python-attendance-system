@@ -17,7 +17,8 @@ def init():
     global LOGGER, ENV
     LOGGER = log.get_logger("main")
     env = config.init()
-    ENV = env[1]
+    if len(env) > 1:
+        ENV = env[1]
 
     neo4j.init()
     settingdao.init()
@@ -34,6 +35,8 @@ def init():
 
 
 def _cron():
+    cache.delete()
+    cache.keys()
     tg.monthly_stats()
     tg.daily_msg()
 

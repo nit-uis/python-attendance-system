@@ -15,13 +15,13 @@ def init():
     LOGGER = log.get_logger("memberdao")
 
 
-def find(tg_group_id: str, status: list):
+def find(tg_group_id: str, mtypes: list, status: list):
     results = CLIENT.run("""
         MATCH (member:TgMember{tgGroupId: $tg_group_id}) 
-        WHERE member.status in $status
+        WHERE member.status in $status and member.type in $mtypes
         RETURN member
         ORDER BY member.type ASC, member.createAt ASC
-    """, {"tg_group_id": tg_group_id, "status": status})
+    """, {"tg_group_id": tg_group_id, "mtypes": mtypes, "status": status})
 
     return [i['member'] for i in results]
 

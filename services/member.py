@@ -78,7 +78,7 @@ def find_by_name(tg_group_id, name: str, status):
     return db_members
 
 
-def list(tg_group_id, status):
+def list(tg_group_id, mtypes, status):
     if not tg_group_id:
         return None
 
@@ -86,7 +86,7 @@ def list(tg_group_id, status):
     if cache := simple_cache.get(key):
         return cache
 
-    db_members = memberdao.find(tg_group_id=tg_group_id, status=status)
+    db_members = memberdao.find(tg_group_id=tg_group_id, mtypes=mtypes, status=status)
     simple_cache.update(key, db_members)
     return db_members
 
