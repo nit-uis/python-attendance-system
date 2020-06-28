@@ -183,7 +183,7 @@ def handle_member(update, context):
 
     set_footprint(tg_id=tg_id, command='member', subcommand='', clean_user_data=True)
 
-    update.message.reply_text(members, reply_markup=reply_markup)
+    context.bot.send_message(chat_id=tg_id, text=members, reply_markup=reply_markup)
 
 
 # handle subcommand
@@ -543,7 +543,7 @@ def handle_event(update, context):
          InlineKeyboardButton("新event", callback_data='create')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text(dates, reply_markup=reply_markup)
+    context.bot.send_message(chat_id=tg_id, text=dates, reply_markup=reply_markup)
 
 
 def _handle_event(update, context, authorized_member):
@@ -991,21 +991,21 @@ def handle_button(update, context):
     db_member = pre_handle(update, context)
     tg_id = db_member['tgId']
 
-    # handle group event command
-    try:
-        bulk_data = query.data.split(";")
-        if len(bulk_data) > 1:
-            data_map = {
-                'member_id': tg_id,
-                'event_id': bulk_data[2],
-                'attendance': bulk_data[3]
-            }
+    # handle group button
+    bulk_data = query.data.split(";")
+    if len(bulk_data) > 1:
+        data_map = {
+            'member_id': tg_id,
+            'event_id': bulk_data[2],
+            'attendance': bulk_data[3]
+        }
 
-            set_footprint(tg_id, command=bulk_data[0], subcommand=bulk_data[1], data_map=data_map)
+        set_footprint(tg_id, command=bulk_data[0], subcommand=bulk_data[1], data_map=data_map)
 
-            if "event" == bulk_data[0]:
-                _handle_event(update, context, db_member)
-    except:
+        if "event" == bulk_data[0]:
+            _handle_event(update, context, db_member)
+    else:
+        # handle non-group button
         fp = get_footprint(tg_id)
 
         if 'command' in fp:
@@ -1019,10 +1019,10 @@ def handle_button(update, context):
                     set_footprint(tg_id, command='event', subcommand=query.data)
 
                 _handle_event(update, context, db_member)
-    finally:
-        # CallbackQueries need to be answered, even if no notification to the user is needed
-        # Some clients may have trouble otherwise. See https://core.telegram.org/bots/api#callbackquery
-        query.answer()
+
+    # CallbackQueries need to be answered, even if no notification to the user is needed
+    # Some clients may have trouble otherwise. See https://core.telegram.org/bots/api#callbackquery
+    query.answer()
 
 
 def handle_input(update, context):
