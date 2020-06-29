@@ -6,8 +6,7 @@ from entities.exceptions import MemberError, EventError
 from utils import ts, log, formatter
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
-from services import member as member_service, event as event_service, security
-
+from services import member as member_service, event as event_service, security, cache
 
 TOKEN = ""
 SUPER_ADMIN_TG_IDS = []
@@ -1000,6 +999,8 @@ def handle_button(update, context):
     query = update.callback_query
     db_member = pre_handle(update, context)
     tg_id = db_member['tgId']
+
+    cache.delete()
 
     # handle group button
     bulk_data = query.data.split(";")

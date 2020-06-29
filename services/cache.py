@@ -29,8 +29,8 @@ def get(key):
 def update(key, value):
     try:
         CACHE.update({key: value})
-    except:
-        LOGGER.warning("cannot delete cache")
+    except Exception as e:
+        LOGGER.warning(f"cannot update cache, key={key}, type(key)={type(key)}e={e}")
 
 
 def delete(key=None, bulk=False):
@@ -49,5 +49,5 @@ def delete(key=None, bulk=False):
                     CACHE.pop(k)
             else:
                 CACHE.pop(key)
-    except:
-        LOGGER.warning("cannot delete cache")
+    except Exception as e:
+        LOGGER.warning(f"cannot delete cache, key={key}, e={e}")
