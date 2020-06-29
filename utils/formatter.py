@@ -131,10 +131,14 @@ def format_event(event, expand: int):
     who_not_sure = set()
 
     for member in event['members']:
+        print(member['attendance'])
         name = member['name']
         reason = ''
         if reason in member['attendance']:
             reason = member['attendance']['reason'].strip()
+        text = name
+        if reason:
+            text = f"{name}({reason})"
         mtype = member['type']
 
         if 'bring' in member['attendance'] and member['attendance']['bring']:
@@ -144,10 +148,6 @@ def format_event(event, expand: int):
 
         if 'name' in member['attendance']:
             if member['attendance']['name'] == "GO":
-                text = name
-                if reason:
-                    text = f"{name}({reason})"
-
                 if mtype == "COACH":
                     who_coach_go.add(text)
                 elif mtype == "GUEST":
@@ -155,9 +155,6 @@ def format_event(event, expand: int):
                 else:
                     who_go.add(text)
             elif member['attendance']['name'] == "NOT_GO":
-                text = name
-                if reason:
-                    text = f"{name}({reason})"
                 who_not_go.add(text)
             else:
                 who_not_sure.add(name)

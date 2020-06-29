@@ -176,6 +176,12 @@ def take_attendance(tg_group_id: str, event_id: str, member_id: str, attendance:
           "attendance": attendance,
           "reason": reason,
           "status": status})
+    print({"tg_group_id": tg_group_id,
+          "event_id": event_id,
+          "member_id": member_id,
+          "attendance": attendance,
+          "reason": reason,
+          "status": status})
 
     return [i['event'] for i in results]
 

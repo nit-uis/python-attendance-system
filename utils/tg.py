@@ -21,7 +21,7 @@ def init(env):
     db_setting = settingdao.get(env)
     TOKEN = db_setting['telegram_token']
     SUPER_ADMIN_TG_IDS = db_setting['superAdminTgIds']
-    TG_GROUP_ID = db_setting['tgGroupId']
+    TG_GROUP_ID = str(db_setting['tgGroupId'])
     LOGGER = log.get_logger("tg")
 
 
@@ -696,7 +696,7 @@ def _handle_event_attend(update, context, authorized_member):
                                   attendance=attendance, reason=reason)
     db_events = event_service.find_by_id(tg_group_id=TG_GROUP_ID, event_id=event_id, status=["ACTIVE"])
     if db_events:
-        text = formatter.format_event(db_events[0], expand=2)
+        text = formatter.format_event(db_events[0], expand=3)
         keyboard = get_group_keyboard(event_id=event_id)
         reply_markup = InlineKeyboardMarkup(keyboard)
         context.bot.send_message(chat_id=TG_GROUP_ID, text=text, reply_markup=reply_markup)
@@ -1006,7 +1006,7 @@ def handle_button(update, context):
     bulk_data = query.data.split(";")
     if len(bulk_data) > 1:
         data_map = {
-            'member_id': tg_id,
+            'member_id': db_member['uuid'],
             'event_id': bulk_data[2],
             'attendance': bulk_data[3]
         }
