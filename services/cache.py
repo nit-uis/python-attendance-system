@@ -20,6 +20,8 @@ def keys():
 
 
 def get(key):
+    # fixme
+    return None
     try:
         return CACHE[key]
     except KeyError:
@@ -30,9 +32,10 @@ def update(key, value):
     try:
         CACHE.update({key: value})
     except Exception as e:
-        LOGGER.warning(f"cannot update cache, key={key}, type(key)={type(key)}e={e}")
+        LOGGER.warning(f"cannot update cache, key={key}, CACHE={CACHE}, type(key)={type(key)}e={e}")
 
 
+# fixme cannot delete cache
 def delete(key=None, bulk=False):
     try:
         if not key:
@@ -50,4 +53,4 @@ def delete(key=None, bulk=False):
             else:
                 CACHE.pop(key)
     except Exception as e:
-        LOGGER.warning(f"cannot delete cache, key={key}, e={e}")
+        LOGGER.warning(f"cannot delete cache, key={key}, CACHE={CACHE}, e={e}")
