@@ -14,6 +14,7 @@ TG_GROUP_ID = ""
 LOGGER = None
 FOOTPRINT = {}
 DEBUG_MODE = True
+COMMANDS = ["/member", "/event", "/me"]
 
 
 def init(env):
@@ -1058,7 +1059,7 @@ def error(update, context):
     try:
         traceback.print_exc()
         tg_id = update.effective_user.id
-        context.bot.send_message(chat_id=tg_id, text=str(context.error))
+        context.bot.send_message(chat_id=tg_id, text=f"你想知啲咩? {' , '.join(COMMANDS)}")
     except Exception as e:
         if DEBUG_MODE:
             traceback.print_exc()

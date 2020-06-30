@@ -131,10 +131,9 @@ def format_event(event, expand: int):
     who_not_sure = set()
 
     for member in event['members']:
-        print(member['attendance'])
         name = member['name']
         reason = ''
-        if reason in member['attendance']:
+        if 'reason' in member['attendance']:
             reason = member['attendance']['reason'].strip()
         text = name
         if reason:
@@ -162,12 +161,12 @@ def format_event(event, expand: int):
             who_not_sure.add(name)
 
     if expand == 3:
-        detail = f"""去: {', '.join(who_go)}
-            去(教練): {', '.join(who_coach_go)}
-            跟操: {', '.join(who_guest_go)}
+        detail = f"""去({len(who_go)}): {', '.join(who_go)}
+            去(教練,{len(who_coach_go)}): {', '.join(who_coach_go)}
+            跟操({len(who_guest_go)}): {', '.join(who_guest_go)}
             
-            唔去: {', '.join(who_not_go)}
-            未知: {', '.join(who_not_sure)}
+            唔去({len(who_not_go)}): {', '.join(who_not_go)}
+            未知({len(who_not_sure)}): {', '.join(who_not_sure)}
         """
     else:
         detail = f"去: {len(who_go)} ({len(who_coach_go)}), 跟操: {len(who_guest_go)}, 唔去: {len(who_not_go)}, 未知: {len(who_not_sure)}"
